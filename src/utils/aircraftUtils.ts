@@ -152,15 +152,15 @@ export function haversineDistance(lat1: number, lon1: number, lat2: number, lon2
 
 export function getCategoryColor(cat: AircraftCategory): string {
   const colors: Record<AircraftCategory, string> = {
-    all: '#60a5fa',
-    commercial: '#60a5fa',
-    cargo: '#f59e0b',
-    military: '#ef4444',
-    private: '#a78bfa',
-    helicopter: '#34d399',
-    glider: '#fbbf24',
-    drone: '#f472b6',
-    ground: '#6b7280',
+    all: '#facc15',
+    commercial: '#facc15',
+    cargo: '#facc15',
+    military: '#ef4444',   // red — keep for safety awareness
+    private: '#facc15',
+    helicopter: '#facc15',
+    glider: '#facc15',
+    drone: '#facc15',
+    ground: '#6b7280',     // gray — keep so ground traffic is distinct
   };
   return colors[cat];
 }

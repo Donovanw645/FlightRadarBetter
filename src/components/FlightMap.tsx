@@ -19,6 +19,34 @@ function deadReckon(lat: number, lon: number, speedMs: number, trackDeg: number,
   return [lat2 * RAD2DEG, lon2 * RAD2DEG];
 }
 
+// Altitude-based gradient: green (low) → blue → yellow → orange → red → purple (high)
+const ALT_STOPS: Array<[number, [number, number, number]]> = [
+  [0,     [34, 197, 94]],   // green
+  [8000,  [59, 130, 246]],  // blue
+  [15000, [234, 179, 8]],   // yellow
+  [25000, [249, 115, 22]],  // orange
+  [35000, [239, 68, 68]],   // red
+  [45000, [168, 85, 247]],  // purple
+];
+
+function altitudeToColor(altMeters: number | null): string {
+  const ft = (altMeters ?? 0) * 3.28084;
+  if (ft <= ALT_STOPS[0][0]) return `rgb(${ALT_STOPS[0][1]})`;
+  const last = ALT_STOPS[ALT_STOPS.length - 1];
+  if (ft >= last[0]) return `rgb(${last[1]})`;
+  for (let i = 1; i < ALT_STOPS.length; i++) {
+    const [f1, c1] = ALT_STOPS[i];
+    if (ft <= f1) {
+      const [f0, c0] = ALT_STOPS[i - 1];
+      const t = (ft - f0) / (f1 - f0);
+      return `rgb(${Math.round(c0[0] + t * (c1[0] - c0[0]))},${Math.round(c0[1] + t * (c1[1] - c0[1]))},${Math.round(c0[2] + t * (c1[2] - c0[2]))})`;
+    }
+  }
+  return `rgb(168,85,247)`;
+}
+
+type HistPt = { lat: number; lon: number; alt: number | null };
+
 const TILE_LAYERS: Record<MapStyle, { url: string; attribution: string }> = {
   dark: {
     url: 'https://{s}.basemaps.cartocdn.com/dark_all/{z}/{x}/{y}{r}.png',
@@ -128,6 +156,8 @@ export default function FlightMap() {
   // baseLat/baseLon are the last authoritative positions; RAF projects forward from them
   const drRef = useRef<Map<string, { baseLat: number; baseLon: number; speed: number; track: number; ts: number }>>(new Map());
   const animRef = useRef<number | null>(null);
+  const historyRef = useRef<Map<string, HistPt[]>>(new Map());
+  const pathRef = useRef<L.Polyline[]>([]);
 
   const {
     aircraft,
@@ -246,6 +276,15 @@ export default function FlightMap() {
         ts: now,
       });
 
+      // Append to flight history (skip if position unchanged)
+      const hist = historyRef.current.get(ac.icao24) ?? [];
+      const last = hist[hist.length - 1];
+      if (!last || Math.abs(last.lat - ac.latitude) > 0.0001 || Math.abs(last.lon - ac.longitude) > 0.0001) {
+        hist.push({ lat: ac.latitude, lon: ac.longitude, alt: ac.baro_altitude });
+        if (hist.length > 300) hist.shift();
+        historyRef.current.set(ac.icao24, hist);
+      }
+
       const existing = markersRef.current.get(ac.icao24);
       if (existing) {
         existing.setLatLng([ac.latitude, ac.longitude]);
@@ -258,6 +297,25 @@ export default function FlightMap() {
       }
     }
   }, [aircraft, filters, selectedAircraft, handleMarkerClick]);
+
+  // Draw altitude-gradient flight path for selected aircraft
+  // Runs AFTER the marker effect so history is fresh before drawing
+  useEffect(() => {
+    pathRef.current.forEach(p => p.remove());
+    pathRef.current = [];
+    if (!selectedAircraft || !mapRef.current) return;
+    const map = mapRef.current;
+    const hist = historyRef.current.get(selectedAircraft.icao24) ?? [];
+    for (let i = 1; i < hist.length; i++) {
+      const a = hist[i - 1], b = hist[i];
+      const color = altitudeToColor(((a.alt ?? 0) + (b.alt ?? 0)) / 2);
+      pathRef.current.push(
+        L.polyline([[a.lat, a.lon], [b.lat, b.lon]], {
+          color, weight: 3.5, opacity: 0.9, interactive: false,
+        }).addTo(map)
+      );
+    }
+  }, [selectedAircraft?.icao24, aircraft]); // eslint-disable-line react-hooks/exhaustive-deps
 
   // RAF dead-reckoning: project each airborne aircraft from its last anchor position
   useEffect(() => {
