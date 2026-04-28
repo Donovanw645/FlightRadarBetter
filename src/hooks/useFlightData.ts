@@ -4,9 +4,10 @@ import { useFlightStore } from '../store/useFlightStore';
 import type { Aircraft } from '../types';
 import { haversineDistance } from '../utils/aircraftUtils';
 
-// adsb.fi open data — free, no auth, CORS-enabled, geographic endpoint
+// adsb.fi open data routed through a CORS proxy (adsb.fi blocks direct browser requests)
 // Docs: https://github.com/adsbfi/opendata
 const ADSB_FI_BASE = 'https://opendata.adsb.fi/api';
+const CORS_PROXY = 'https://corsproxy.io/?';
 const RADIUS_NM = 250; // max allowed by adsb.fi
 const REFRESH_INTERVAL = 15000;
 
@@ -90,11 +91,25 @@ export function useFlightData() {
     try {
       setIsLoading(true);
       const [lat, lon] = mapCenter;
-      const url = `${ADSB_FI_BASE}/v3/lat/${lat.toFixed(2)}/lon/${lon.toFixed(2)}/dist/${RADIUS_NM}`;
-      const res = await axios.get<AdsbFiResponse>(url, { timeout: 15000 });
+      const targetUrl = `${ADSB_FI_BASE}/v3/lat/${lat.toFixed(2)}/lon/${lon.toFixed(2)}/dist/${RADIUS_NM}`;
+
+      // adsb.fi has no CORS headers, route through proxy
+      let data: AdsbFiResponse;
+      try {
+        const res = await axios.get(`${CORS_PROXY}${encodeURIComponent(targetUrl)}`, { timeout: 15000 });
+        data = (typeof res.data === 'string' ? JSON.parse(res.data) : res.data) as AdsbFiResponse;
+      } catch {
+        // Fallback: allorigins.win proxy
+        const res = await axios.get(
+          `https://api.allorigins.win/raw?url=${encodeURIComponent(targetUrl)}`,
+          { timeout: 20000 }
+        );
+        data = (typeof res.data === 'string' ? JSON.parse(res.data) : res.data) as AdsbFiResponse;
+      }
+
       if (!isMountedRef.current) return;
 
-      const aircraft = parseAdsbFiData(res.data);
+      const aircraft = parseAdsbFiData(data);
       setAircraft(aircraft);
       setLastUpdate(new Date());
       setFetchError(null);
