@@ -2,7 +2,7 @@ import { useEffect, useState } from 'react';
 import {
   X, Crosshair, Navigation, Gauge, ArrowUp, Globe,
   Tag, Calendar, Wrench, Info, ExternalLink, Camera,
-  ChevronDown, ChevronUp, Navigation2
+  ChevronDown, ChevronUp, Navigation2, AlertTriangle, RadioTower, PhoneOff
 } from 'lucide-react';
 import { useFlightStore } from '../store/useFlightStore';
 import { fetchAircraftInfo, fetchJetPhoto } from '../hooks/useFlightData';
@@ -11,10 +11,10 @@ import {
   getAircraftCategory, getCategoryColor, getCategoryLabel, isMilitary
 } from '../utils/aircraftUtils';
 
-const SQUAWK_CODES: Record<string, string> = {
-  '7500': '⚠️ Hijacking',
-  '7600': '📻 Radio Failure',
-  '7700': '🆘 Emergency',
+const SQUAWK_CODES: Record<string, { label: string; icon: React.ReactNode }> = {
+  '7500': { label: 'Hijacking', icon: <AlertTriangle size={13} /> },
+  '7600': { label: 'Radio Failure', icon: <PhoneOff size={13} /> },
+  '7700': { label: 'Emergency', icon: <RadioTower size={13} /> },
 };
 
 export default function AircraftSidebar() {
@@ -58,7 +58,7 @@ export default function AircraftSidebar() {
   const cat = getAircraftCategory(ac);
   const catColor = getCategoryColor(cat);
   const military = isMilitary(ac);
-  const squawkWarning = ac.squawk ? SQUAWK_CODES[ac.squawk] : null;
+  const squawkWarning = ac.squawk ? (SQUAWK_CODES[ac.squawk] ?? null) : null;
 
   return (
     <>
@@ -139,9 +139,12 @@ function SidebarContent({
       <div className="flex-1 overflow-y-auto">
         {/* Emergency squawk */}
         {squawkWarning && (
-          <div className="mx-3 mt-3 p-2.5 bg-red-900/50 border border-red-700 rounded-xl text-center">
-            <p className="text-sm font-bold text-red-300">{squawkWarning}</p>
-            <p className="text-xs text-red-400">Squawk {ac.squawk}</p>
+          <div className="mx-3 mt-3 p-2.5 bg-red-900/40 border border-red-800/60 rounded-xl">
+            <div className="flex items-center gap-2 text-red-300">
+              {squawkWarning.icon}
+              <span className="text-sm font-bold">{squawkWarning.label}</span>
+              <span className="text-xs text-red-500 ml-auto font-mono">Squawk {ac.squawk}</span>
+            </div>
           </div>
         )}
 

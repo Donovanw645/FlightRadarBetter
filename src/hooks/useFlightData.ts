@@ -5,13 +5,39 @@ import type { Aircraft } from '../types';
 import { haversineDistance } from '../utils/aircraftUtils';
 
 const OPENSKY_URL = 'https://opensky-network.org/api/states/all';
-const REFRESH_INTERVAL = 10000;
+const PROXY_URL = `https://api.allorigins.win/get?url=${encodeURIComponent(OPENSKY_URL)}`;
+const REFRESH_INTERVAL = 15000;
+
+function parseOpenSkyData(data: { states: unknown[][] | null }): Aircraft[] {
+  const states: unknown[][] = data?.states ?? [];
+  return states.map((s) => ({
+    icao24: s[0] as string,
+    callsign: (s[1] as string)?.trim() || null,
+    origin_country: s[2] as string,
+    time_position: s[3] as number | null,
+    last_contact: s[4] as number,
+    longitude: s[5] as number | null,
+    latitude: s[6] as number | null,
+    baro_altitude: s[7] as number | null,
+    on_ground: s[8] as boolean,
+    velocity: s[9] as number | null,
+    true_track: s[10] as number | null,
+    vertical_rate: s[11] as number | null,
+    sensors: s[12] as number[] | null,
+    geo_altitude: s[13] as number | null,
+    squawk: s[14] as string | null,
+    spi: s[15] as boolean,
+    position_source: s[16] as number,
+    category: (s[17] as number) ?? 0,
+  }));
+}
 
 export function useFlightData() {
   const {
     setAircraft,
     setIsLoading,
     setLastUpdate,
+    setFetchError,
     spottingAlerts,
     addTriggeredAlert,
     userLocation,
@@ -21,35 +47,27 @@ export function useFlightData() {
   const isMountedRef = useRef(true);
 
   const fetchFlights = async () => {
+    if (!isMountedRef.current) return;
     try {
       setIsLoading(true);
-      const res = await axios.get(OPENSKY_URL, { timeout: 15000 });
+
+      let data: { states: unknown[][] | null };
+
+      try {
+        const res = await axios.get<{ states: unknown[][] | null }>(OPENSKY_URL, { timeout: 12000 });
+        data = res.data;
+      } catch {
+        // Direct fetch failed (CORS or network); try via proxy
+        const proxyRes = await axios.get<{ contents: string }>(PROXY_URL, { timeout: 15000 });
+        data = JSON.parse(proxyRes.data.contents) as { states: unknown[][] | null };
+      }
+
       if (!isMountedRef.current) return;
 
-      const states: unknown[][] = res.data?.states ?? [];
-      const aircraft: Aircraft[] = states.map((s) => ({
-        icao24: s[0] as string,
-        callsign: (s[1] as string)?.trim() || null,
-        origin_country: s[2] as string,
-        time_position: s[3] as number | null,
-        last_contact: s[4] as number,
-        longitude: s[5] as number | null,
-        latitude: s[6] as number | null,
-        baro_altitude: s[7] as number | null,
-        on_ground: s[8] as boolean,
-        velocity: s[9] as number | null,
-        true_track: s[10] as number | null,
-        vertical_rate: s[11] as number | null,
-        sensors: s[12] as number[] | null,
-        geo_altitude: s[13] as number | null,
-        squawk: s[14] as string | null,
-        spi: s[15] as boolean,
-        position_source: s[16] as number,
-        category: s[17] as number ?? 0,
-      }));
-
+      const aircraft = parseOpenSkyData(data);
       setAircraft(aircraft);
       setLastUpdate(new Date());
+      setFetchError(null);
 
       if (userLocation) {
         for (const alert of spottingAlerts) {
@@ -58,8 +76,11 @@ export function useFlightData() {
             if (!ac.latitude || !ac.longitude) continue;
             const dist = haversineDistance(alert.lat, alert.lng, ac.latitude, ac.longitude);
             if (dist <= alert.radius) {
-              if (alert.callsign === '*' || alert.callsign === '' ||
-                (ac.callsign ?? '').toUpperCase().includes(alert.callsign.toUpperCase())) {
+              if (
+                alert.callsign === '*' ||
+                alert.callsign === '' ||
+                (ac.callsign ?? '').toUpperCase().includes(alert.callsign.toUpperCase())
+              ) {
                 addTriggeredAlert({ ...alert, callsign: ac.callsign ?? alert.callsign });
               }
             }
@@ -67,7 +88,9 @@ export function useFlightData() {
         }
       }
     } catch {
-      // OpenSky may rate-limit; silent fail
+      if (isMountedRef.current) {
+        setFetchError('Unable to load flight data — retrying shortly');
+      }
     } finally {
       if (isMountedRef.current) setIsLoading(false);
     }
@@ -97,8 +120,6 @@ export async function fetchAircraftInfo(icao24: string) {
 }
 
 export async function fetchJetPhoto(registration: string): Promise<{ imageUrl: string; photographer: string } | null> {
-  // JetPhotos doesn't have an official API; we use their search page via a proxy-friendly URL pattern
-  // In production you'd use a backend proxy; here we return null and show fallback
   try {
     const proxyUrl = `https://api.allorigins.win/raw?url=${encodeURIComponent(`https://www.jetphotos.com/photo/keyword/${registration}`)}`;
     const res = await axios.get(proxyUrl, { timeout: 8000 });

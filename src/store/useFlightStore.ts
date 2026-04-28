@@ -13,6 +13,7 @@ interface FlightStore {
   userLocation: [number, number] | null;
   isLoading: boolean;
   lastUpdate: Date | null;
+  fetchError: string | null;
   sidebarOpen: boolean;
   followAircraft: boolean;
 
@@ -30,6 +31,7 @@ interface FlightStore {
   setUserLocation: (loc: [number, number] | null) => void;
   setIsLoading: (loading: boolean) => void;
   setLastUpdate: (date: Date) => void;
+  setFetchError: (error: string | null) => void;
   setSidebarOpen: (open: boolean) => void;
   setFollowAircraft: (follow: boolean) => void;
 }
@@ -56,6 +58,7 @@ export const useFlightStore = create<FlightStore>((set) => ({
   userLocation: null,
   isLoading: false,
   lastUpdate: null,
+  fetchError: null,
   sidebarOpen: false,
   followAircraft: false,
 
@@ -82,6 +85,7 @@ export const useFlightStore = create<FlightStore>((set) => ({
   setUserLocation: (userLocation) => set({ userLocation }),
   setIsLoading: (isLoading) => set({ isLoading }),
   setLastUpdate: (lastUpdate) => set({ lastUpdate }),
+  setFetchError: (fetchError) => set({ fetchError }),
   setSidebarOpen: (sidebarOpen) => set({ sidebarOpen }),
   setFollowAircraft: (followAircraft) => set({ followAircraft }),
 }));
