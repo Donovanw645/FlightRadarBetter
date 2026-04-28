@@ -17,6 +17,7 @@ export interface Aircraft {
   spi: boolean;
   position_source: number;
   category: number;
+  typeCode?: string;
 }
 
 export interface AircraftInfo {

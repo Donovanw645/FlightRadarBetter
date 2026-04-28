@@ -39,7 +39,7 @@ export default function AircraftSidebar() {
     // Both info and photo come from planespotters.net — fire in parallel
     Promise.all([
       fetchAircraftInfo(ac.icao24),
-      fetchJetPhoto(ac.icao24),
+      fetchJetPhoto(ac.icao24, ac.typeCode),
     ]).then(([info, photo]) => {
       setAircraftInfo(info);
       setJetPhoto(photo);
@@ -102,6 +102,11 @@ function SidebarContent({
             <span className="font-bold text-lg text-white font-mono">
               {ac.callsign?.trim() || ac.icao24.toUpperCase()}
             </span>
+            {ac.typeCode && (
+              <span className="text-[11px] font-bold px-2 py-0.5 rounded-full bg-gray-700 text-gray-200 font-mono tracking-wider">
+                {ac.typeCode.toUpperCase()}
+              </span>
+            )}
             <span
               className="text-[10px] font-semibold px-2 py-0.5 rounded-full uppercase tracking-wider"
               style={{ backgroundColor: catColor + '30', color: catColor }}

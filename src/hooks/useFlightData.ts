@@ -22,6 +22,7 @@ interface AdsbFiAircraft {
   squawk?: string;
   category?: string;
   on_ground?: boolean;
+  t?: string;
 }
 
 interface AdsbFiResponse {
@@ -66,6 +67,7 @@ function parseAdsbFiData(data: AdsbFiResponse): Aircraft[] {
       spi: false,
       position_source: 0,
       category: mapCategory(ac.category),
+      typeCode: ac.t ?? undefined,
     };
   });
 }
@@ -202,6 +204,73 @@ export function useFlightData() {
   }, [mapCenter]);
 }
 
+// ─── Wikipedia stock photo fallback ───────────────────────────────────────
+
+const TYPE_WIKI: Record<string, string> = {
+  // Airbus narrowbody
+  A318: 'Airbus_A318', A319: 'Airbus_A319', A320: 'Airbus_A320_family',
+  A321: 'Airbus_A321', A20N: 'Airbus_A320neo_family', A21N: 'Airbus_A321neo_family',
+  A19N: 'Airbus_A319neo',
+  // Airbus widebody
+  A300: 'Airbus_A300', A310: 'Airbus_A310', A330: 'Airbus_A330',
+  A332: 'Airbus_A330', A333: 'Airbus_A330', A339: 'Airbus_A330neo',
+  A340: 'Airbus_A340', A342: 'Airbus_A340', A343: 'Airbus_A340', A345: 'Airbus_A340', A346: 'Airbus_A340',
+  A350: 'Airbus_A350', A35K: 'Airbus_A350', A359: 'Airbus_A350',
+  A380: 'Airbus_A380', A388: 'Airbus_A380',
+  // Boeing narrowbody
+  B732: 'Boeing_737_Classic', B733: 'Boeing_737_Classic', B734: 'Boeing_737_Classic', B735: 'Boeing_737_Classic',
+  B736: 'Boeing_737_Next_Generation', B737: 'Boeing_737_Next_Generation',
+  B738: 'Boeing_737_Next_Generation', B739: 'Boeing_737_Next_Generation',
+  B38M: 'Boeing_737_MAX', B39M: 'Boeing_737_MAX',
+  // Boeing widebody
+  B741: 'Boeing_747', B742: 'Boeing_747', B743: 'Boeing_747', B744: 'Boeing_747', B748: 'Boeing_747-8',
+  B752: 'Boeing_757', B753: 'Boeing_757',
+  B762: 'Boeing_767', B763: 'Boeing_767', B764: 'Boeing_767',
+  B772: 'Boeing_777', B773: 'Boeing_777', B77L: 'Boeing_777', B77W: 'Boeing_777',
+  B788: 'Boeing_787_Dreamliner', B789: 'Boeing_787_Dreamliner', B78X: 'Boeing_787_Dreamliner',
+  // Regional jets
+  E170: 'Embraer_170', E175: 'Embraer_175', E190: 'Embraer_190', E195: 'Embraer_195',
+  E75L: 'Embraer_175', E7W: 'Embraer_E-Jet_E2_family',
+  CRJ2: 'Bombardier_CRJ200', CRJ7: 'Bombardier_CRJ700', CRJ9: 'Bombardier_CRJ900',
+  DH8D: 'Bombardier_Dash_8', AT75: 'ATR_72', AT72: 'ATR_72', AT45: 'ATR_42',
+  // Turboprops / GA
+  C172: 'Cessna_172', C182: 'Cessna_182', C208: 'Cessna_208_Caravan',
+  BE20: 'Beechcraft_Super_King_Air', BE35: 'Beechcraft_Bonanza',
+  PA28: 'Piper_Cherokee', PC12: 'Pilatus_PC-12',
+  // Military
+  C130: 'Lockheed_C-130_Hercules', C17: 'Boeing_C-17_Globemaster_III',
+  KC135: 'Boeing_KC-135_Stratotanker', KC10: 'McDonnell_Douglas_KC-10_Extender',
+  F16: 'General_Dynamics_F-16_Fighting_Falcon', F15: 'McDonnell_Douglas_F-15_Eagle',
+  F18: 'McDonnell_Douglas_F/A-18_Hornet', F35: 'Lockheed_Martin_F-35_Lightning_II',
+  F22: 'Lockheed_Martin_F-22_Raptor', B52: 'Boeing_B-52_Stratofortress',
+  B2: 'Northrop_Grumman_B-2_Spirit', U2: 'Lockheed_U-2',
+  A10: 'Fairchild_Republic_A-10_Thunderbolt_II', V22: 'Bell_Boeing_V-22_Osprey',
+  // Helicopters
+  EC35: 'Eurocopter_EC135', EC45: 'Airbus_H145', B06: 'Bell_206',
+  R44: 'Robinson_R44', S76: 'Sikorsky_S-76', AS32: 'Aerospatiale_AS332_Super_Puma',
+  // Business jets
+  GL5T: 'Bombardier_Global_5000', GLEX: 'Bombardier_Global_Express',
+  F900: 'Dassault_Falcon_900', F2TH: 'Dassault_Falcon_2000',
+  C56X: 'Cessna_Citation_X', C680: 'Cessna_Citation_Sovereign',
+  LJ45: 'Learjet_45', LJ60: 'Learjet_60',
+};
+
+async function fetchWikiPhoto(typeCode: string): Promise<JetPhoto | null> {
+  const article = TYPE_WIKI[typeCode.toUpperCase()];
+  if (!article) return null;
+  try {
+    const res = await axios.get<{ thumbnail?: { source: string }; title: string }>(
+      `https://en.wikipedia.org/api/rest_v1/page/summary/${encodeURIComponent(article)}`,
+      { timeout: 8000 }
+    );
+    const src = res.data?.thumbnail?.source;
+    if (!src) return null;
+    return { imageUrl: src, photographer: `Wikipedia – ${res.data.title}` };
+  } catch {
+    return null;
+  }
+}
+
 // ─── Planespotters.net — CORS-enabled, returns info + photos in one call ───
 
 interface PlanespottersResponse {
@@ -257,18 +326,20 @@ export async function fetchAircraftInfo(icao24: string): Promise<AircraftInfo | 
   }
 }
 
-export async function fetchJetPhoto(icao24: string): Promise<JetPhoto | null> {
+export async function fetchJetPhoto(icao24: string, typeCode?: string): Promise<JetPhoto | null> {
   try {
     const res = await axios.get<PlanespottersResponse>(
       `https://api.planespotters.net/pub/aircraft/${icao24}`,
       { timeout: 8000 }
     );
     const photo = res.data?.aircraft?.[0]?.photos?.photos?.[0];
-    if (!photo) return null;
-    const imageUrl = photo.large?.src ?? photo.medium?.src ?? photo.thumbnail?.src ?? '';
-    if (!imageUrl) return null;
-    return { imageUrl, photographer: photo.photographer ?? 'Unknown' };
+    if (photo) {
+      const imageUrl = photo.large?.src ?? photo.medium?.src ?? photo.thumbnail?.src ?? '';
+      if (imageUrl) return { imageUrl, photographer: photo.photographer ?? 'Unknown' };
+    }
   } catch {
-    return null;
+    // fall through to Wikipedia fallback
   }
+  if (typeCode) return fetchWikiPhoto(typeCode);
+  return null;
 }

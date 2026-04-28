@@ -5,6 +5,20 @@ import { useFlightStore } from '../store/useFlightStore';
 import { filterAircraft, getAircraftCategory, getCategoryColor, getRotation } from '../utils/aircraftUtils';
 import type { MapStyle, Aircraft, AircraftCategory } from '../types';
 
+const DEG2RAD = Math.PI / 180;
+const RAD2DEG = 180 / Math.PI;
+
+function deadReckon(lat: number, lon: number, speedMs: number, trackDeg: number, dt: number): [number, number] {
+  const dist = speedMs * dt;
+  const R = 6371000;
+  const trackRad = trackDeg * DEG2RAD;
+  const lat1 = lat * DEG2RAD;
+  const lon1 = lon * DEG2RAD;
+  const lat2 = Math.asin(Math.sin(lat1) * Math.cos(dist / R) + Math.cos(lat1) * Math.sin(dist / R) * Math.cos(trackRad));
+  const lon2 = lon1 + Math.atan2(Math.sin(trackRad) * Math.sin(dist / R) * Math.cos(lat1), Math.cos(dist / R) - Math.sin(lat1) * Math.sin(lat2));
+  return [lat2 * RAD2DEG, lon2 * RAD2DEG];
+}
+
 const TILE_LAYERS: Record<MapStyle, { url: string; attribution: string }> = {
   dark: {
     url: 'https://{s}.basemaps.cartocdn.com/dark_all/{z}/{x}/{y}{r}.png',
@@ -109,6 +123,8 @@ export default function FlightMap() {
   const spottingCirclesRef = useRef<L.Circle[]>([]);
   const containerRef = useRef<HTMLDivElement>(null);
   const movDebounceRef = useRef<ReturnType<typeof setTimeout> | null>(null);
+  const drRef = useRef<Map<string, { lat: number; lon: number; speed: number; track: number; ts: number }>>(new Map());
+  const animFrameRef = useRef<number | null>(null);
 
   const {
     aircraft,
@@ -193,7 +209,7 @@ export default function FlightMap() {
     [setSelectedAircraft]
   );
 
-  // Update markers
+  // Update markers + seed dead-reckoning state
   useEffect(() => {
     if (!mapRef.current) return;
     const map = mapRef.current;
@@ -205,10 +221,11 @@ export default function FlightMap() {
       if (!filteredIds.has(id)) {
         marker.remove();
         markersRef.current.delete(id);
+        drRef.current.delete(id);
       }
     }
 
-    // Add/update
+    const now = Date.now();
     for (const ac of filtered) {
       if (!ac.latitude || !ac.longitude) continue;
       const cat = getAircraftCategory(ac);
@@ -216,6 +233,15 @@ export default function FlightMap() {
       const rotation = getRotation(ac);
       const isSelected = selectedAircraft?.icao24 === ac.icao24;
       const icon = createAircraftIcon(color, rotation, isSelected, ac.on_ground, cat);
+
+      // Seed / refresh DR state with authoritative position
+      drRef.current.set(ac.icao24, {
+        lat: ac.latitude,
+        lon: ac.longitude,
+        speed: ac.velocity ?? 0,
+        track: ac.true_track ?? 0,
+        ts: now,
+      });
 
       const existing = markersRef.current.get(ac.icao24);
       if (existing) {
@@ -229,6 +255,30 @@ export default function FlightMap() {
       }
     }
   }, [aircraft, filters, selectedAircraft, handleMarkerClick]);
+
+  // Dead-reckoning animation loop
+  useEffect(() => {
+    const ANIM_INTERVAL = 1000;
+    const loop = () => {
+      const now = Date.now();
+      for (const [id, state] of drRef.current) {
+        if (state.speed < 5 || state.track === 0) continue;
+        const dt = (now - state.ts) / 1000;
+        if (dt <= 0) continue;
+        const [newLat, newLon] = deadReckon(state.lat, state.lon, state.speed, state.track, dt);
+        state.lat = newLat;
+        state.lon = newLon;
+        state.ts = now;
+        const marker = markersRef.current.get(id);
+        marker?.setLatLng([newLat, newLon]);
+      }
+      animFrameRef.current = window.setTimeout(loop, ANIM_INTERVAL);
+    };
+    animFrameRef.current = window.setTimeout(loop, ANIM_INTERVAL);
+    return () => {
+      if (animFrameRef.current !== null) clearTimeout(animFrameRef.current);
+    };
+  }, []);
 
   // Follow selected aircraft
   useEffect(() => {
