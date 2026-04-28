@@ -216,18 +216,32 @@ const TYPE_WIKI: Record<string, string> = {
   C172: 'Cessna_172', C182: 'Cessna_182', C208: 'Cessna_208_Caravan',
   BE20: 'Beechcraft_Super_King_Air', BE35: 'Beechcraft_Bonanza',
   PA28: 'Piper_Cherokee', PC12: 'Pilatus_PC-12',
-  // Military fixed-wing
+  // Military fixed-wing — transports
   C130: 'Lockheed_C-130_Hercules', C17: 'Boeing_C-17_Globemaster_III',
+  C5M: 'Lockheed_C-5_Galaxy', C141: 'Lockheed_C-141_Starlifter',
+  C2: 'Grumman_C-2_Greyhound', C9: 'McDonnell_Douglas_C-9',
+  C12: 'Beechcraft_Super_King_Air', C20: 'Gulfstream_III', C21: 'Learjet_35',
+  C26: 'Fairchild_Metro', C32: 'Boeing_C-32', C37: 'Gulfstream_V', C40: 'Boeing_737',
+  // Military fixed-wing — tankers & special mission
   KC135: 'Boeing_KC-135_Stratotanker', KC10: 'McDonnell_Douglas_KC-10_Extender',
   KC46: 'Boeing_KC-46_Pegasus',
+  E2: 'Northrop_Grumman_E-2_Hawkeye', E3: 'Boeing_E-3_Sentry',
+  E6: 'Boeing_E-6_Mercury', E8: 'Northrop_Grumman_E-8_Joint_STARS',
+  EP3: 'Lockheed_EP-3_Aries', RC135: 'Boeing_RC-135',
+  P3: 'Lockheed_P-3_Orion', P8: 'Boeing_P-8_Poseidon',
+  // Military fixed-wing — fighters & attack
   F16: 'General_Dynamics_F-16_Fighting_Falcon', F15: 'McDonnell_Douglas_F-15_Eagle',
   F18: 'McDonnell_Douglas_F/A-18_Hornet', F35: 'Lockheed_Martin_F-35_Lightning_II',
-  F22: 'Lockheed_Martin_F-22_Raptor', B52: 'Boeing_B-52_Stratofortress',
+  F22: 'Lockheed_Martin_F-22_Raptor', F14: 'Grumman_F-14_Tomcat',
+  B52: 'Boeing_B-52_Stratofortress', B1B: 'Rockwell_B-1_Lancer',
   B2: 'Northrop_Grumman_B-2_Spirit', U2: 'Lockheed_U-2',
   A10: 'Fairchild_Republic_A-10_Thunderbolt_II', V22: 'Bell_Boeing_V-22_Osprey',
-  E3: 'Boeing_E-3_Sentry', E8: 'Northrop_Grumman_E-8_Joint_STARS',
-  P3: 'Lockheed_P-3_Orion', P8: 'Boeing_P-8_Poseidon',
-  C5M: 'Lockheed_C-5_Galaxy', C141: 'Lockheed_C-141_Starlifter',
+  // Military fixed-wing — trainers
+  T38: 'Northrop_T-38_Talon', T45: 'McDonnell_Douglas_T-45_Goshawk',
+  T6: 'Beechcraft_T-6_Texan_II', T1: 'Raytheon_T-1_Jayhawk',
+  // Experimental / NASA X-planes
+  X59: 'Lockheed_Martin_X-59_QueSST',
+  X47: 'Northrop_Grumman_X-47', X48: 'Boeing_X-48',
   // Helicopters — civil
   EC35: 'Airbus_H135', EC45: 'Airbus_H145', EC30: 'Eurocopter_EC130',
   EC20: 'Eurocopter_EC120_Colibri', EC55: 'Airbus_H155',
@@ -264,10 +278,14 @@ const MILITARY_TYPE_WIKI: Record<string, string> = {
   B752: 'Boeing_C-32',                   // C-32A VIP transport
   B744: 'Boeing_E-4',                    // E-4B Nightwatch
   B772: 'Boeing_E-767',                  // E-767 AWACS variant
-  DC87: 'Boeing_C-17_Globemaster_III',   // sometimes listed as DC-8 derivative
+  DC87: 'Boeing_C-17_Globemaster_III',
   L100: 'Lockheed_C-130_Hercules',       // civilian C-130 designation
   C130: 'Lockheed_C-130_Hercules',
   C17: 'Boeing_C-17_Globemaster_III',
+  T38: 'Northrop_T-38_Talon',
+  T45: 'McDonnell_Douglas_T-45_Goshawk',
+  T6: 'Beechcraft_T-6_Texan_II',
+  X59: 'Lockheed_Martin_X-59_QueSST',
 };
 
 // Guaranteed category-level fallback — ensures every airborne aircraft gets a photo

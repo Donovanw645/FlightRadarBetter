@@ -47,8 +47,8 @@ function categoryFromTypeCode(tc: string): AircraftCategory | null {
   if (/^(C1[0-9]{2}|C2[0-9]{2}|C3[0-9]{2}|C4[0-9]{2}|PA[0-9]{2}|BE[0-9]{2}|SR[0-9]{2}|DA[0-9]{2}|PC[0-9]|TBM|TB[0-9]|P28|P32|P46|M20)/.test(t)) return 'private';
   // Helicopters
   if (/^(EC[0-9]|AS[0-9]|AW[0-9]|R[0-9]{2}|S[67][0-9]|B06|B21|B41|BK1|H1[0-9]|H6[05]|MD5|MD9|HU[12]|NH9|RQ|UH|SH|CH4|CH5)/.test(t)) return 'helicopter';
-  // Military (common ICAO type codes that differ from civilian)
-  if (/^(F1[456]|F1[89]|F22|F35|A10|B1B|B52|B2|C130|C17A|KC13|KC46|E3[CF]|E8C|U2|SR7|MQ9|RQ4|C5M|C141|P8)/.test(t)) return 'military';
+  // Military fixed-wing: fighters, trainers, transports, patrol, tankers, AWACS, drones, X-planes
+  if (/^(F1[456]|F1[89]|F22|F35|A10|B1B|B52|B2|C130|C17A?|KC1[03]|KC46|E[2368]|E8C|U2|SR7|MQ[19]|RQ4|C5M?|C141|P8|T38|T45|T6|T1A?|X[0-9]|EP3|RC1|OV1|OA1|E45|VC[12]|C2[0-9]|C9[0-9]|C12|C20|C21|C26|C32|C37|C40)/.test(t)) return 'military';
   // Gliders
   if (/^(ASW|ASK|LS[0-9]|DG[0-9]|LAK|PIK|SZD|GR0|K8|G10[24])/.test(t)) return 'glider';
   return null;
