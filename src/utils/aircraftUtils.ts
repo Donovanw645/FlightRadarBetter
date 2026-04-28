@@ -34,16 +34,21 @@ export function isMilitary(aircraft: Aircraft): boolean {
 export function getAircraftCategory(aircraft: Aircraft): AircraftCategory {
   if (aircraft.on_ground) return 'ground';
   if (isMilitary(aircraft)) return 'military';
+
+  // ICAO ADS-B emitter categories (adsb.fi/readsb encoding):
+  // 1=light(A1), 2=small(A2), 3=large(A3), 4=high-vortex(A4), 5=heavy(A5)
+  // 6=high-perf(A6), 7=rotorcraft(A7), 9=glider(B1), 14=UAV(B6)
   const cat = aircraft.category;
-  if (cat === 1) return 'glider';
-  if (cat === 2) return 'glider';
-  if (cat === 3) return 'glider';
   if (cat === 7) return 'helicopter';
+  if (cat === 9) return 'glider';
   if (cat === 14) return 'drone';
-  if (cat === 17 || cat === 18 || cat === 19 || cat === 20) return 'drone';
+  if (cat === 3 || cat === 4 || cat === 5) return 'commercial';
+  if (cat === 1 || cat === 2) return 'private';
+
+  // Heuristic fallback using speed / altitude
   const vel = aircraft.velocity ?? 0;
   const alt = aircraft.baro_altitude ?? 0;
-  if (vel < 50 && alt < 1000 && !aircraft.on_ground) return 'helicopter';
+  if (vel < 30 && alt < 500) return 'helicopter';
   if (vel > 400 || alt > 25000) return 'commercial';
   if (vel > 200) return 'commercial';
   return 'private';

@@ -36,20 +36,16 @@ export default function AircraftSidebar() {
     setLoadingPhoto(true);
     setPhotoError(false);
 
-    fetchAircraftInfo(ac.icao24).then((info) => {
+    // Both info and photo come from planespotters.net — fire in parallel
+    Promise.all([
+      fetchAircraftInfo(ac.icao24),
+      fetchJetPhoto(ac.icao24),
+    ]).then(([info, photo]) => {
       setAircraftInfo(info);
+      setJetPhoto(photo);
       setLoadingInfo(false);
-
-      if (info?.registration) {
-        fetchJetPhoto(info.registration).then((photo) => {
-          setJetPhoto(photo);
-          setLoadingPhoto(false);
-          if (!photo) setPhotoError(true);
-        });
-      } else {
-        setLoadingPhoto(false);
-        setPhotoError(true);
-      }
+      setLoadingPhoto(false);
+      if (!photo) setPhotoError(true);
     });
   }, [ac?.icao24]);
 

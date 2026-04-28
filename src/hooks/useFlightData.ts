@@ -1,12 +1,13 @@
 import { useEffect, useRef } from 'react';
 import axios from 'axios';
 import { useFlightStore } from '../store/useFlightStore';
-import type { Aircraft } from '../types';
+import type { Aircraft, AircraftInfo, JetPhoto } from '../types';
 import { haversineDistance } from '../utils/aircraftUtils';
 
 const ADSB_FI_BASE = 'https://opendata.adsb.fi/api';
 const RADIUS_NM = 250;
-const REFRESH_INTERVAL = 15000;
+const REFRESH_INTERVAL = 20000;
+const MIN_FETCH_GAP = 8000; // don't fetch more often than this
 
 interface AdsbFiAircraft {
   hex: string;
@@ -29,7 +30,6 @@ interface AdsbFiResponse {
   total: number;
 }
 
-// Normalise Leaflet longitude (can exceed ±180 when scrolling past dateline)
 function normaliseLon(lon: number): number {
   return ((((lon + 180) % 360) + 360) % 360) - 180;
 }
@@ -70,31 +70,49 @@ function parseAdsbFiData(data: AdsbFiResponse): Aircraft[] {
   });
 }
 
-async function fetchAdsbFi(lat: number, lon: number): Promise<AdsbFiResponse> {
-  const target = `${ADSB_FI_BASE}/v3/lat/${lat.toFixed(2)}/lon/${lon.toFixed(2)}/dist/${RADIUS_NM}`;
+// Rotating proxy pool — remembers which one worked last
+let lastProxy = 0;
 
-  // corsproxy.io: append raw URL (NOT encoded) after the ?
-  try {
-    const res = await axios.get<AdsbFiResponse>(
-      `https://corsproxy.io/?${target}`,
-      { timeout: 14000 }
-    );
-    return res.data;
-  } catch (e1) {
-    console.warn('[PlaneTracker] corsproxy.io failed, trying allorigins:', e1);
-  }
+async function fetchWithProxy(targetUrl: string): Promise<AdsbFiResponse> {
+  type ProxyFn = () => Promise<AdsbFiResponse>;
+  const proxies: ProxyFn[] = [
+    // corsproxy.io — raw URL, no encoding
+    async () => {
+      const r = await axios.get<AdsbFiResponse>(`https://corsproxy.io/?${targetUrl}`, { timeout: 14000 });
+      return r.data;
+    },
+    // allorigins /get — wraps body in { contents: string }
+    async () => {
+      const r = await axios.get<{ contents: string }>(
+        `https://api.allorigins.win/get?url=${encodeURIComponent(targetUrl)}`,
+        { timeout: 16000 }
+      );
+      return JSON.parse(r.data.contents) as AdsbFiResponse;
+    },
+    // codetabs proxy
+    async () => {
+      const r = await axios.get<AdsbFiResponse>(
+        `https://api.codetabs.com/v1/proxy?quest=${encodeURIComponent(targetUrl)}`,
+        { timeout: 14000 }
+      );
+      return r.data;
+    },
+  ];
 
-  // allorigins /get: wraps response in { contents: string }
-  try {
-    const res = await axios.get<{ contents: string }>(
-      `https://api.allorigins.win/get?url=${encodeURIComponent(target)}`,
-      { timeout: 18000 }
-    );
-    return JSON.parse(res.data.contents) as AdsbFiResponse;
-  } catch (e2) {
-    console.error('[PlaneTracker] both proxies failed:', e2);
-    throw e2;
+  // Try from last-known-good proxy, then wrap around
+  for (let i = 0; i < proxies.length; i++) {
+    const idx = (lastProxy + i) % proxies.length;
+    try {
+      const data = await proxies[idx]();
+      if (Array.isArray(data?.ac)) {
+        lastProxy = idx;
+        return data;
+      }
+    } catch (e) {
+      console.warn(`[PlaneTracker] proxy ${idx} failed:`, e);
+    }
   }
+  throw new Error('All proxies failed');
 }
 
 export function useFlightData() {
@@ -109,23 +127,28 @@ export function useFlightData() {
     userLocation,
   } = useFlightStore();
 
-  // Ref so fetchFlights always uses the latest center without restarting the interval
   const mapCenterRef = useRef<[number, number]>(mapCenter);
   mapCenterRef.current = mapCenter;
 
   const isMountedRef = useRef(true);
   const intervalRef = useRef<ReturnType<typeof setInterval> | null>(null);
   const panDebounceRef = useRef<ReturnType<typeof setTimeout> | null>(null);
+  const lastFetchRef = useRef<number>(0);
 
   const fetchFlights = async () => {
     if (!isMountedRef.current) return;
+    const now = Date.now();
+    if (now - lastFetchRef.current < MIN_FETCH_GAP) return;
+    lastFetchRef.current = now;
+
     try {
       setIsLoading(true);
       const [rawLat, rawLon] = mapCenterRef.current;
       const lat = Math.max(-85, Math.min(85, rawLat));
       const lon = normaliseLon(rawLon);
 
-      const data = await fetchAdsbFi(lat, lon);
+      const target = `${ADSB_FI_BASE}/v3/lat/${lat.toFixed(2)}/lon/${lon.toFixed(2)}/dist/${RADIUS_NM}`;
+      const data = await fetchWithProxy(target);
       if (!isMountedRef.current) return;
 
       const aircraft = parseAdsbFiData(data);
@@ -158,7 +181,6 @@ export function useFlightData() {
     }
   };
 
-  // Main interval — only restarts when alerts/location change, NOT on every pan
   useEffect(() => {
     isMountedRef.current = true;
     fetchFlights();
@@ -169,7 +191,6 @@ export function useFlightData() {
     };
   }, [spottingAlerts, userLocation]);
 
-  // On map pan: trigger one fresh fetch after a short settle delay
   useEffect(() => {
     if (panDebounceRef.current) clearTimeout(panDebounceRef.current);
     panDebounceRef.current = setTimeout(() => {
@@ -181,32 +202,72 @@ export function useFlightData() {
   }, [mapCenter]);
 }
 
-export async function fetchAircraftInfo(icao24: string) {
+// ─── Planespotters.net — CORS-enabled, returns info + photos in one call ───
+
+interface PlanespottersResponse {
+  aircraft: Array<{
+    reg?: string;
+    type?: string;
+    icaotype?: string;
+    operatorname?: string;
+    operator?: string;
+    country?: string;
+    photos?: {
+      photos?: Array<{
+        large?: { src: string };
+        medium?: { src: string };
+        thumbnail?: { src: string };
+        photographer?: string;
+      }>;
+    };
+  }>;
+}
+
+export async function fetchAircraftInfo(icao24: string): Promise<AircraftInfo | null> {
   try {
-    const res = await axios.get(
-      `https://opensky-network.org/api/metadata/aircraft/icao/${icao24}`,
+    const res = await axios.get<PlanespottersResponse>(
+      `https://api.planespotters.net/pub/aircraft/${icao24}`,
       { timeout: 8000 }
     );
-    return res.data;
+    const ac = res.data?.aircraft?.[0];
+    if (!ac) return null;
+    return {
+      icao24,
+      registration: ac.reg ?? '',
+      manufacturericao: '',
+      manufacturername: '',
+      model: ac.type ?? '',
+      typecode: ac.icaotype ?? '',
+      serialnumber: '',
+      linenumber: '',
+      icaoaircrafttype: ac.icaotype ?? '',
+      operator: ac.operatorname ?? ac.operator ?? '',
+      operatorcallsign: '',
+      operatoricao: '',
+      operatoriata: '',
+      owner: '',
+      categoryDescription: '',
+      built: '',
+      engines: '',
+      country: ac.country ?? '',
+      notes: '',
+    };
   } catch {
     return null;
   }
 }
 
-export async function fetchJetPhoto(registration: string): Promise<{ imageUrl: string; photographer: string } | null> {
+export async function fetchJetPhoto(icao24: string): Promise<JetPhoto | null> {
   try {
-    const proxyUrl = `https://api.allorigins.win/raw?url=${encodeURIComponent(`https://www.jetphotos.com/photo/keyword/${registration}`)}`;
-    const res = await axios.get(proxyUrl, { timeout: 8000 });
-    const html: string = res.data;
-    const imgMatch = html.match(/https:\/\/cdn\.jetphotos\.com\/full\/[^"']+\.jpg/);
-    const photographerMatch = html.match(/class="result__photographer"[^>]*>([^<]+)<\/a>/);
-    if (imgMatch) {
-      return {
-        imageUrl: imgMatch[0],
-        photographer: photographerMatch ? photographerMatch[1].trim() : 'Unknown',
-      };
-    }
-    return null;
+    const res = await axios.get<PlanespottersResponse>(
+      `https://api.planespotters.net/pub/aircraft/${icao24}`,
+      { timeout: 8000 }
+    );
+    const photo = res.data?.aircraft?.[0]?.photos?.photos?.[0];
+    if (!photo) return null;
+    const imageUrl = photo.large?.src ?? photo.medium?.src ?? photo.thumbnail?.src ?? '';
+    if (!imageUrl) return null;
+    return { imageUrl, photographer: photo.photographer ?? 'Unknown' };
   } catch {
     return null;
   }
