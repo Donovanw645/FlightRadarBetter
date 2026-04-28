@@ -207,15 +207,41 @@ const TYPE_WIKI: Record<string, string> = {
   B762: 'Boeing_767', B763: 'Boeing_767', B764: 'Boeing_767',
   B772: 'Boeing_777', B773: 'Boeing_777', B77L: 'Boeing_777', B77W: 'Boeing_777',
   B788: 'Boeing_787_Dreamliner', B789: 'Boeing_787_Dreamliner', B78X: 'Boeing_787_Dreamliner',
-  // Regional jets
+  // Regional jets & turboprops
   E170: 'Embraer_170', E175: 'Embraer_175', E190: 'Embraer_190', E195: 'Embraer_195',
-  E75L: 'Embraer_175', E7W: 'Embraer_E-Jet_E2_family',
+  E75L: 'Embraer_175', E7W: 'Embraer_E-Jet_E2_family', E295: 'Embraer_E-Jet_E2_family',
   CRJ2: 'Bombardier_CRJ200', CRJ7: 'Bombardier_CRJ700', CRJ9: 'Bombardier_CRJ900',
-  DH8D: 'Bombardier_Dash_8', AT75: 'ATR_72', AT72: 'ATR_72', AT45: 'ATR_42',
-  // Turboprops / GA
-  C172: 'Cessna_172', C182: 'Cessna_182', C208: 'Cessna_208_Caravan',
+  DH8D: 'Bombardier_Dash_8', DH8C: 'Bombardier_Dash_8', DH8A: 'Bombardier_Dash_8',
+  AT75: 'ATR_72', AT72: 'ATR_72', AT45: 'ATR_42', AT42: 'ATR_42',
+  SF34: 'Saab_340', S340: 'Saab_340', JS32: 'British_Aerospace_Jetstream',
+  JS41: 'British_Aerospace_Jetstream', BE1900: 'Beechcraft_1900',
+  B190: 'Beechcraft_1900', SW4: 'Fairchild_Swearingen_Metroliner',
+  CVLT: 'Convair_580', DC3: 'Douglas_DC-3',
+  // Cargo / freight
+  MD11: 'McDonnell_Douglas_MD-11', DC10: 'McDonnell_Douglas_DC-10',
+  AN24: 'Antonov_An-24',
+  // Turboprops / GA — Cessna
+  C172: 'Cessna_172', C182: 'Cessna_182', C152: 'Cessna_150',
+  C210: 'Cessna_210_Centurion', C206: 'Cessna_206', C205: 'Cessna_205',
+  C207: 'Cessna_207', C208: 'Cessna_208_Caravan', C337: 'Cessna_337_Skymaster',
+  C340: 'Cessna_340', C414: 'Cessna_414', C421: 'Cessna_421',
+  C510: 'Cessna_Citation_Mustang', C525: 'Cessna_CitationJet',
+  C25A: 'Cessna_CitationJet', C25B: 'Cessna_CitationJet', C25C: 'Cessna_CitationJet',
+  // GA — Piper
+  PA28: 'Piper_Cherokee', PA18: 'Piper_Super_Cub', PA24: 'Piper_Comanche',
+  PA32: 'Piper_Cherokee', PA34: 'Piper_Seneca', PA44: 'Piper_Seminole',
+  PA46: 'Piper_Malibu', P46T: 'Piper_Malibu',
+  // GA — Beechcraft
   BE20: 'Beechcraft_Super_King_Air', BE35: 'Beechcraft_Bonanza',
-  PA28: 'Piper_Cherokee', PC12: 'Pilatus_PC-12',
+  BE36: 'Beechcraft_Bonanza', BE55: 'Beechcraft_Baron', BE58: 'Beechcraft_Baron',
+  BE60: 'Beechcraft_Duke', BE76: 'Beechcraft_Duchess',
+  // GA — other
+  PC12: 'Pilatus_PC-12', PC24: 'Pilatus_PC-24',
+  SR20: 'Cirrus_SR20', SR22: 'Cirrus_SR22',
+  DA40: 'Diamond_DA40', DA42: 'Diamond_DA42', DA62: 'Diamond_DA62',
+  TBM7: 'TBM_700', TBM8: 'TBM_700', TBM9: 'TBM_700',
+  M20T: 'Mooney_M20', M20P: 'Mooney_M20',
+  RV6: "Van's_RV-6", RV7: "Van's_RV-7", RV8: "Van's_RV-8", RV10: "Van's_RV-10",
   // Military fixed-wing — transports
   C130: 'Lockheed_C-130_Hercules', C17: 'Boeing_C-17_Globemaster_III',
   C5M: 'Lockheed_C-5_Galaxy', C141: 'Lockheed_C-141_Starlifter',
@@ -239,9 +265,31 @@ const TYPE_WIKI: Record<string, string> = {
   // Military fixed-wing — trainers
   T38: 'Northrop_T-38_Talon', T45: 'McDonnell_Douglas_T-45_Goshawk',
   T6: 'Beechcraft_T-6_Texan_II', T1: 'Raytheon_T-1_Jayhawk',
+  T28: 'North_American_T-28_Trojan', T33: 'Lockheed_T-33',
   // Experimental / NASA X-planes
   X59: 'Lockheed_Martin_X-59_QueSST',
   X47: 'Northrop_Grumman_X-47', X48: 'Boeing_X-48',
+  // Warbirds / ex-military jets
+  HUNT: 'Hawker_Hunter', L39: 'Aero_L-39_Albatros',
+  L159: 'Aero_L-159_ALCA', MB33: 'SIAI-Marchetti_MB-339',
+  F86: 'North_American_F-86_Sabre', F84: 'Republic_F-84_Thunderjet',
+  P51: 'North_American_P-51_Mustang', MSTG: 'North_American_P-51_Mustang',
+  P38: 'Lockheed_P-38_Lightning', P47: 'Republic_P-47_Thunderbolt',
+  B17: 'Boeing_B-17_Flying_Fortress', B25: 'North_American_B-25_Mitchell',
+  B24: 'Consolidated_B-24_Liberator', B29: 'Boeing_B-29_Superfortress',
+  TBF: 'Grumman_TBF_Avenger', A4: 'Douglas_A-4_Skyhawk',
+  SPIT: 'Supermarine_Spitfire', HURR: 'Hawker_Hurricane',
+  // Foreign military — Western
+  EUFI: 'Eurofighter_Typhoon', EF2K: 'Eurofighter_Typhoon',
+  MIR2: 'Dassault_Mirage_2000', MIR4: 'Dassault_Mirage_F1',
+  TORS: 'Panavia_Tornado', GRIF: 'Saab_JAS_39_Gripen',
+  JAS3: 'Saab_JAS_39_Gripen', HARR: 'Hawker_Siddeley_Harrier',
+  HAWK: 'BAE_Systems_Hawk', JAGU: 'SEPECAT_Jaguar',
+  PC21: 'Pilatus_PC-21',
+  // Foreign military — Russian/Chinese
+  SU27: 'Sukhoi_Su-27', SU30: 'Sukhoi_Su-30', SU35: 'Sukhoi_Su-35',
+  MIG2: 'Mikoyan_MiG-29', MIG3: 'Mikoyan_MiG-31',
+  IL76: 'Ilyushin_Il-76', AN12: 'Antonov_An-12', AN72: 'Antonov_An-72',
   // Helicopters — civil
   EC35: 'Airbus_H135', EC45: 'Airbus_H145', EC30: 'Eurocopter_EC130',
   EC20: 'Eurocopter_EC120_Colibri', EC55: 'Airbus_H155',

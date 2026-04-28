@@ -43,12 +43,16 @@ function categoryFromTypeCode(tc: string): AircraftCategory | null {
   if (t === 'CONC' || t === 'SSC') return 'commercial';
   // Business jets (Gulfstream, Bombardier Global, Dassault Falcon, Cessna Citation, Learjet)
   if (/^(GL[0-9T]|GV|G[0-9]{3}|F[29][0-9T]|C5[0-9]{2}|C68[05]|C750|LJ[0-9]|H25|CL6)/.test(t)) return 'private';
-  // Cessna piston/turboprop, Piper, Beechcraft, Cirrus, Diamond, Pilatus
-  if (/^(C1[0-9]{2}|C2[0-9]{2}|C3[0-9]{2}|C4[0-9]{2}|PA[0-9]{2}|BE[0-9]{2}|SR[0-9]{2}|DA[0-9]{2}|PC[0-9]|TBM|TB[0-9]|P28|P32|P46|M20)/.test(t)) return 'private';
+  // Cessna piston/turboprop, Piper, Beechcraft, Cirrus, Diamond, Pilatus, Van's RV, misc GA
+  if (/^(C1[0-9]{2}|C2[0-9]{2}|C3[0-9]{2}|C4[0-9]{2}|PA[0-9]{2}|BE[0-9]{2}|SR[0-9]{2}|DA[0-9]{2}|PC[0-9]|TBM|TB[0-9]|P28|P32|P46|M20|RV[0-9]|A36|VANS|RANS|C510|C525|C25[ABC]|PC24|PC6T|PRM1|B55|B58|B60|B76)/.test(t)) return 'private';
   // Helicopters
   if (/^(EC[0-9]|AS[0-9]|AW[0-9]|R[0-9]{2}|S[67][0-9]|B06|B21|B41|BK1|H1[0-9]|H6[05]|MD5|MD9|HU[12]|NH9|RQ|UH|SH|CH4|CH5)/.test(t)) return 'helicopter';
-  // Military fixed-wing: fighters, trainers, transports, patrol, tankers, AWACS, drones, X-planes
+  // Military fixed-wing: fighters, trainers, transports, AWACS, tankers, drones, X-planes
   if (/^(F1[456]|F1[89]|F22|F35|A10|B1B|B52|B2|C130|C17A?|KC1[03]|KC46|E[2368]|E8C|U2|SR7|MQ[19]|RQ4|C5M?|C141|P8|T38|T45|T6|T1A?|X[0-9]|EP3|RC1|OV1|OA1|E45|VC[12]|C2[0-9]|C9[0-9]|C12|C20|C21|C26|C32|C37|C40)/.test(t)) return 'military';
+  // Warbirds / ex-military jets operated privately
+  if (/^(HUNT|L39|L159|MB33|MB32|T33|T28|A4|F86|F84|F80|SPIT|HURR|MSTG|P51|P38|P47|TBF|B17|B24|B25|B29|DC3M)/.test(t)) return 'military';
+  // Foreign military (Eurofighter, Mirage, Tornado, Gripen, Harrier, etc.)
+  if (/^(EUFI|EF2K|MIR2|MIR4|TORS|GRIF|JAS3|HARR|SU27|SU30|SU35|MIG2|MIG3|JA37|SAAB|HAWK|JAGU|BUCK|NIMR|ATLE|PC21|MB33|ALH|LCA|FC1|J10|J20|JH7)/.test(t)) return 'military';
   // Gliders
   if (/^(ASW|ASK|LS[0-9]|DG[0-9]|LAK|PIK|SZD|GR0|K8|G10[24])/.test(t)) return 'glider';
   return null;
@@ -58,29 +62,35 @@ export function getAircraftCategory(aircraft: Aircraft): AircraftCategory {
   if (aircraft.on_ground) return 'ground';
   if (isMilitary(aircraft)) return 'military';
 
-  // ICAO ADS-B emitter categories (adsb.fi/readsb encoding):
-  // 1=light(A1), 2=small(A2), 3=large(A3), 4=high-vortex(A4), 5=heavy(A5)
-  // 6=high-perf(A6), 7=rotorcraft(A7), 9=glider(B1), 14=UAV(B6)
+  // ICAO ADS-B emitter category from transponder
   const cat = aircraft.category;
+
+  // Highly specific categories — trust these unconditionally
   if (cat === 7) return 'helicopter';
   if (cat === 9) return 'glider';
   if (cat === 14) return 'drone';
-  if (cat === 3 || cat === 4 || cat === 5) return 'commercial';
-  if (cat === 6) return 'private'; // high-performance (business jets etc.)
-  if (cat === 1 || cat === 2) return 'private';
+  if (cat === 3 || cat === 4 || cat === 5) return 'commercial'; // large/heavy jets
 
-  // Use ICAO type code when ADS-B category is unknown
+  // Check type code BEFORE trusting ambiguous cat=1/2/6.
+  // A Hawker Hunter or T-38 often broadcasts cat=1 (light) but is military.
+  // A business jet may broadcast cat=2 (small) but is not a GA Cessna.
   if (aircraft.typeCode) {
     const fromType = categoryFromTypeCode(aircraft.typeCode);
     if (fromType) return fromType;
   }
 
-  // Speed/altitude heuristic — velocity in m/s, altitude in metres
+  // Speed/altitude heuristic BEFORE accepting cat=1/2/6 at face value.
+  // 230 m/s ≈ 447 kts — impossible for any real GA aircraft.
   const vel = aircraft.velocity ?? 0;
   const alt = aircraft.baro_altitude ?? 0;
   if (vel < 30 && alt < 500) return 'helicopter';
-  if (alt > 7500 || vel > 200) return 'commercial'; // 7500 m ≈ 24 600 ft, 200 m/s ≈ 389 kts
-  if (vel > 100) return 'private';
+  if (alt > 7500 || vel > 230) return 'commercial'; // 7500 m ≈ 24 600 ft
+  if (vel > 140) return 'private';                  // 140 m/s ≈ 272 kts — fast turboprop/bizjet
+
+  // Remaining ambiguous cat values
+  if (cat === 6) return 'private';
+  if (cat === 1 || cat === 2) return 'private';
+
   return 'private';
 }
 
