@@ -31,6 +31,29 @@ export function isMilitary(aircraft: Aircraft): boolean {
   return false;
 }
 
+function categoryFromTypeCode(tc: string): AircraftCategory | null {
+  const t = tc.toUpperCase();
+  // Airbus narrowbody / widebody (A318-A388, A20N, A21N, A19N, etc.)
+  if (/^A3[0-9]/.test(t) || t === 'A20N' || t === 'A21N' || t === 'A19N' || t === 'A22N') return 'commercial';
+  // Boeing narrowbody / widebody (B717, B737-B787, B38M MAX, B39M MAX)
+  if (/^B7[0-9]/.test(t) || t === 'B38M' || t === 'B39M' || t === 'B3XM') return 'commercial';
+  // Embraer E-jets, CRJ, ATR, Dash-8, MD-80/90
+  if (/^(E[12][0-9]{2}|CRJ|DH8|AT[47]|MD[89])/.test(t)) return 'commercial';
+  // Concorde / supersonic
+  if (t === 'CONC' || t === 'SSC') return 'commercial';
+  // Business jets (Gulfstream, Bombardier Global, Dassault Falcon, Cessna Citation, Learjet)
+  if (/^(GL[0-9T]|GV|G[0-9]{3}|F[29][0-9T]|C5[0-9]{2}|C68[05]|C750|LJ[0-9]|H25|CL6)/.test(t)) return 'private';
+  // Cessna piston/turboprop, Piper, Beechcraft, Cirrus, Diamond, Pilatus
+  if (/^(C1[0-9]{2}|C2[0-9]{2}|C3[0-9]{2}|C4[0-9]{2}|PA[0-9]{2}|BE[0-9]{2}|SR[0-9]{2}|DA[0-9]{2}|PC[0-9]|TBM|TB[0-9]|P28|P32|P46|M20)/.test(t)) return 'private';
+  // Helicopters
+  if (/^(EC[0-9]|AS[0-9]|AW[0-9]|R[0-9]{2}|S[67][0-9]|B06|B21|B41|BK1|H1[0-9]|H6[05]|MD5|MD9|HU[12]|NH9|RQ|UH|SH|CH4|CH5)/.test(t)) return 'helicopter';
+  // Military (common ICAO type codes that differ from civilian)
+  if (/^(F1[456]|F1[89]|F22|F35|A10|B1B|B52|B2|C130|C17A|KC13|KC46|E3[CF]|E8C|U2|SR7|MQ9|RQ4|C5M|C141|P8)/.test(t)) return 'military';
+  // Gliders
+  if (/^(ASW|ASK|LS[0-9]|DG[0-9]|LAK|PIK|SZD|GR0|K8|G10[24])/.test(t)) return 'glider';
+  return null;
+}
+
 export function getAircraftCategory(aircraft: Aircraft): AircraftCategory {
   if (aircraft.on_ground) return 'ground';
   if (isMilitary(aircraft)) return 'military';
@@ -43,14 +66,21 @@ export function getAircraftCategory(aircraft: Aircraft): AircraftCategory {
   if (cat === 9) return 'glider';
   if (cat === 14) return 'drone';
   if (cat === 3 || cat === 4 || cat === 5) return 'commercial';
+  if (cat === 6) return 'private'; // high-performance (business jets etc.)
   if (cat === 1 || cat === 2) return 'private';
 
-  // Heuristic fallback using speed / altitude
+  // Use ICAO type code when ADS-B category is unknown
+  if (aircraft.typeCode) {
+    const fromType = categoryFromTypeCode(aircraft.typeCode);
+    if (fromType) return fromType;
+  }
+
+  // Speed/altitude heuristic — velocity in m/s, altitude in metres
   const vel = aircraft.velocity ?? 0;
   const alt = aircraft.baro_altitude ?? 0;
   if (vel < 30 && alt < 500) return 'helicopter';
-  if (vel > 400 || alt > 25000) return 'commercial';
-  if (vel > 200) return 'commercial';
+  if (alt > 7500 || vel > 200) return 'commercial'; // 7500 m ≈ 24 600 ft, 200 m/s ≈ 389 kts
+  if (vel > 100) return 'private';
   return 'private';
 }
 

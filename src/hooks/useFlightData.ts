@@ -6,8 +6,8 @@ import { haversineDistance } from '../utils/aircraftUtils';
 
 const ADSB_FI_BASE = 'https://opendata.adsb.fi/api';
 const RADIUS_NM = 250;
-const REFRESH_INTERVAL = 20000;
-const MIN_FETCH_GAP = 8000; // don't fetch more often than this
+const REFRESH_INTERVAL = 10000;
+const MIN_FETCH_GAP = 4000;
 
 interface AdsbFiAircraft {
   hex: string;
@@ -72,49 +72,28 @@ function parseAdsbFiData(data: AdsbFiResponse): Aircraft[] {
   });
 }
 
-// Rotating proxy pool — remembers which one worked last
-let lastProxy = 0;
+function validate(data: AdsbFiResponse): AdsbFiResponse {
+  if (!Array.isArray(data?.ac)) throw new Error('invalid response');
+  return data;
+}
 
 async function fetchWithProxy(targetUrl: string): Promise<AdsbFiResponse> {
-  type ProxyFn = () => Promise<AdsbFiResponse>;
-  const proxies: ProxyFn[] = [
-    // corsproxy.io — raw URL, no encoding
-    async () => {
-      const r = await axios.get<AdsbFiResponse>(`https://corsproxy.io/?${targetUrl}`, { timeout: 14000 });
-      return r.data;
-    },
-    // allorigins /get — wraps body in { contents: string }
-    async () => {
-      const r = await axios.get<{ contents: string }>(
-        `https://api.allorigins.win/get?url=${encodeURIComponent(targetUrl)}`,
-        { timeout: 16000 }
-      );
-      return JSON.parse(r.data.contents) as AdsbFiResponse;
-    },
-    // codetabs proxy
-    async () => {
-      const r = await axios.get<AdsbFiResponse>(
-        `https://api.codetabs.com/v1/proxy?quest=${encodeURIComponent(targetUrl)}`,
-        { timeout: 14000 }
-      );
-      return r.data;
-    },
+  // Race all three proxies simultaneously — first valid response wins
+  const attempts: Promise<AdsbFiResponse>[] = [
+    axios.get<AdsbFiResponse>(`https://corsproxy.io/?${targetUrl}`, { timeout: 9000 })
+      .then(r => validate(r.data)),
+    axios.get<{ contents: string }>(
+      `https://api.allorigins.win/get?url=${encodeURIComponent(targetUrl)}`,
+      { timeout: 11000 }
+    ).then(r => validate(JSON.parse(r.data.contents) as AdsbFiResponse)),
+    axios.get<AdsbFiResponse>(
+      `https://api.codetabs.com/v1/proxy?quest=${encodeURIComponent(targetUrl)}`,
+      { timeout: 9000 }
+    ).then(r => validate(r.data)),
   ];
 
-  // Try from last-known-good proxy, then wrap around
-  for (let i = 0; i < proxies.length; i++) {
-    const idx = (lastProxy + i) % proxies.length;
-    try {
-      const data = await proxies[idx]();
-      if (Array.isArray(data?.ac)) {
-        lastProxy = idx;
-        return data;
-      }
-    } catch (e) {
-      console.warn(`[PlaneTracker] proxy ${idx} failed:`, e);
-    }
-  }
-  throw new Error('All proxies failed');
+  // Promise.any: resolves with first success, throws AggregateError only if all fail
+  return (Promise as any).any(attempts).catch(() => { throw new Error('All proxies failed'); });
 }
 
 export function useFlightData() {

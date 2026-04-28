@@ -47,7 +47,3 @@ html, body, #root {
 .animate-bounce-in {
   animation: bounce-in 0.3s ease-out;
 }
-
-.leaflet-marker-pane .leaflet-marker-icon {
-  transition: transform 200ms linear;
-}

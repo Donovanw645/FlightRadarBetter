@@ -41,51 +41,53 @@ const TILE_LAYERS: Record<MapStyle, { url: string; attribution: string }> = {
 function aircraftShape(cat: AircraftCategory, color: string, stroke: string, sw: number): string {
   switch (cat) {
     case 'helicopter':
-      // Round body + main rotor cross + tail boom + tail rotor
+      // Top-down: tail boom → tail rotor → main rotor bar → fuselage body on top
       return `
-        <ellipse cx="12" cy="11" rx="3" ry="4.5" fill="${color}" opacity="0.95" stroke="${stroke}" stroke-width="${sw}"/>
-        <rect x="2.5" y="10.5" width="19" height="1.5" rx="0.75" fill="${color}" opacity="0.7"/>
-        <rect x="11.2" y="15.5" width="1.6" height="5.5" rx="0.8" fill="${color}" opacity="0.95"/>
-        <rect x="8.5" y="20" width="7" height="1.2" rx="0.6" fill="${color}" opacity="0.7"/>`;
+        <rect x="11.2" y="14" width="1.6" height="8.5" rx="0.8" fill="${color}"/>
+        <rect x="8.2" y="20.5" width="7.6" height="1.4" rx="0.7" fill="${color}" opacity="0.85"/>
+        <rect x="1.5" y="9.5" width="21" height="2" rx="1" fill="${color}" opacity="0.7"/>
+        <ellipse cx="12" cy="10" rx="3.2" ry="4.8" fill="${color}" stroke="${stroke}" stroke-width="${sw}"/>`;
 
     case 'drone':
-      // Quadcopter X frame with motors at corners
+      // Quadcopter X-frame with four motor discs
       return `
-        <line x1="12" y1="12" x2="6.5" y2="6.5" stroke="${color}" stroke-width="1.8" stroke-linecap="round"/>
-        <line x1="12" y1="12" x2="17.5" y2="6.5" stroke="${color}" stroke-width="1.8" stroke-linecap="round"/>
-        <line x1="12" y1="12" x2="6.5" y2="17.5" stroke="${color}" stroke-width="1.8" stroke-linecap="round"/>
-        <line x1="12" y1="12" x2="17.5" y2="17.5" stroke="${color}" stroke-width="1.8" stroke-linecap="round"/>
-        <circle cx="12" cy="12" r="2.5" fill="${color}" opacity="0.95"/>
-        <circle cx="6.5" cy="6.5" r="2.2" fill="${color}" opacity="0.85"/>
-        <circle cx="17.5" cy="6.5" r="2.2" fill="${color}" opacity="0.85"/>
-        <circle cx="6.5" cy="17.5" r="2.2" fill="${color}" opacity="0.85"/>
-        <circle cx="17.5" cy="17.5" r="2.2" fill="${color}" opacity="0.85"/>`;
+        <line x1="12" y1="12" x2="5.5" y2="5.5" stroke="${color}" stroke-width="1.6" stroke-linecap="round"/>
+        <line x1="12" y1="12" x2="18.5" y2="5.5" stroke="${color}" stroke-width="1.6" stroke-linecap="round"/>
+        <line x1="12" y1="12" x2="5.5" y2="18.5" stroke="${color}" stroke-width="1.6" stroke-linecap="round"/>
+        <line x1="12" y1="12" x2="18.5" y2="18.5" stroke="${color}" stroke-width="1.6" stroke-linecap="round"/>
+        <circle cx="5.5" cy="5.5" r="2.8" fill="${color}" opacity="0.85"/>
+        <circle cx="18.5" cy="5.5" r="2.8" fill="${color}" opacity="0.85"/>
+        <circle cx="5.5" cy="18.5" r="2.8" fill="${color}" opacity="0.85"/>
+        <circle cx="18.5" cy="18.5" r="2.8" fill="${color}" opacity="0.85"/>
+        <circle cx="12" cy="12" r="2.2" fill="${color}" stroke="${stroke}" stroke-width="${sw}"/>`;
 
     case 'military':
-      // Delta/swept fighter silhouette + small tail fin
+      // Top-down delta-wing fighter + twin tail fins
       return `
-        <path d="M12 2 L14.5 11 L21 15 L12 13 L3 15 L9.5 11 Z"
-          fill="${color}" opacity="0.95" stroke="${stroke}" stroke-width="${sw}" stroke-linejoin="round"/>
-        <path d="M12 13 L14 20.5 L12 21.5 L10 20.5 Z"
-          fill="${color}" opacity="0.95" stroke="${stroke}" stroke-width="${sw}"/>`;
+        <path d="M12 2 L20 20 L12 16.5 L4 20 Z"
+          fill="${color}" stroke="${stroke}" stroke-width="${sw}" stroke-linejoin="round"/>
+        <path d="M10.2 16.5 L8 22 L10 22.5 L12 19 L14 22.5 L16 22 L13.8 16.5 Z"
+          fill="${color}" opacity="0.9"/>`;
 
     case 'glider':
-      // Very long straight wings — distinctive wingspan
+      // Very long straight wings with pencil-thin fuselage
       return `
-        <path d="M12 2 L12.5 8.5 L23 11.5 L12.5 12.5 L12.5 20 L13.5 21.5 L12 22.5 L10.5 21.5 L11.5 20 L11.5 12.5 L1 11.5 L11.5 8.5 Z"
-          fill="${color}" opacity="0.95" stroke="${stroke}" stroke-width="${sw}"/>`;
+        <path d="M10.8 11 L1 12.5 L1 14 L10.8 13 L13.2 13 L23 14 L23 12.5 L13.2 11 Z" fill="${color}"/>
+        <ellipse cx="12" cy="12" rx="1.3" ry="10" fill="${color}" stroke="${stroke}" stroke-width="${sw}"/>`;
 
     case 'private':
-      // Shorter wingspan than airliner, straighter wing sweep
+      // Small GA plane — straight wings, T-tail
       return `
-        <path d="M12 3 L12.8 8 L20 10.5 L12.8 12 L13 19 L14.5 21 L12 22 L9.5 21 L11 19 L11.2 12 L4 10.5 L11.2 8 Z"
-          fill="${color}" opacity="0.95" stroke="${stroke}" stroke-width="${sw}"/>`;
+        <ellipse cx="12" cy="12" rx="2" ry="9" fill="${color}" stroke="${stroke}" stroke-width="${sw}"/>
+        <path d="M10 10 L1.5 13 L1.5 14.5 L10 13 L14 13 L22.5 14.5 L22.5 13 L14 10 Z" fill="${color}"/>
+        <path d="M10.5 19.5 L7 22 L7.5 23 L12 21.5 L16.5 23 L17 22 L13.5 19.5 Z" fill="${color}"/>`;
 
     default:
-      // Commercial / cargo — classic swept-wing airliner
+      // Commercial / cargo — swept-wing airliner with horizontal stabilizer
       return `
-        <path d="M12 2 L13 8 L22 11 L13 13 L13.5 20 L15.5 22 L12 23 L8.5 22 L10.5 20 L11 13 L2 11 L11 8 Z"
-          fill="${color}" opacity="0.95" stroke="${stroke}" stroke-width="${sw}"/>`;
+        <ellipse cx="12" cy="12" rx="2.2" ry="10" fill="${color}" stroke="${stroke}" stroke-width="${sw}"/>
+        <path d="M12 9.5 L22.5 16 L21.5 17.5 L12 13 L2.5 17.5 L1.5 16 Z" fill="${color}"/>
+        <path d="M12 20 L17 23 L16.5 23.8 L12 22 L7.5 23.8 L7 23 Z" fill="${color}"/>`;
   }
 }
 
@@ -123,8 +125,9 @@ export default function FlightMap() {
   const spottingCirclesRef = useRef<L.Circle[]>([]);
   const containerRef = useRef<HTMLDivElement>(null);
   const movDebounceRef = useRef<ReturnType<typeof setTimeout> | null>(null);
-  const drRef = useRef<Map<string, { lat: number; lon: number; speed: number; track: number; ts: number }>>(new Map());
-  const animFrameRef = useRef<number | null>(null);
+  // baseLat/baseLon are the last authoritative positions; RAF projects forward from them
+  const drRef = useRef<Map<string, { baseLat: number; baseLon: number; speed: number; track: number; ts: number }>>(new Map());
+  const animRef = useRef<number | null>(null);
 
   const {
     aircraft,
@@ -234,10 +237,10 @@ export default function FlightMap() {
       const isSelected = selectedAircraft?.icao24 === ac.icao24;
       const icon = createAircraftIcon(color, rotation, isSelected, ac.on_ground, cat);
 
-      // Seed / refresh DR state with authoritative position
+      // Anchor DR state to fresh authoritative position
       drRef.current.set(ac.icao24, {
-        lat: ac.latitude,
-        lon: ac.longitude,
+        baseLat: ac.latitude,
+        baseLon: ac.longitude,
         speed: ac.velocity ?? 0,
         track: ac.true_track ?? 0,
         ts: now,
@@ -256,28 +259,21 @@ export default function FlightMap() {
     }
   }, [aircraft, filters, selectedAircraft, handleMarkerClick]);
 
-  // Dead-reckoning animation loop
+  // RAF dead-reckoning: project each airborne aircraft from its last anchor position
   useEffect(() => {
-    const ANIM_INTERVAL = 1000;
-    const loop = () => {
+    const animate = () => {
       const now = Date.now();
-      for (const [id, state] of drRef.current) {
-        if (state.speed < 5 || state.track === 0) continue;
-        const dt = (now - state.ts) / 1000;
-        if (dt <= 0) continue;
-        const [newLat, newLon] = deadReckon(state.lat, state.lon, state.speed, state.track, dt);
-        state.lat = newLat;
-        state.lon = newLon;
-        state.ts = now;
-        const marker = markersRef.current.get(id);
-        marker?.setLatLng([newLat, newLon]);
+      for (const [id, s] of drRef.current) {
+        if (s.speed < 3) continue;               // ignore near-stationary
+        const dt = (now - s.ts) / 1000;
+        if (dt <= 0 || dt > 90) continue;        // don't extrapolate beyond 90 s
+        const [lat, lon] = deadReckon(s.baseLat, s.baseLon, s.speed, s.track, dt);
+        markersRef.current.get(id)?.setLatLng([lat, lon]);
       }
-      animFrameRef.current = window.setTimeout(loop, ANIM_INTERVAL);
+      animRef.current = requestAnimationFrame(animate);
     };
-    animFrameRef.current = window.setTimeout(loop, ANIM_INTERVAL);
-    return () => {
-      if (animFrameRef.current !== null) clearTimeout(animFrameRef.current);
-    };
+    animRef.current = requestAnimationFrame(animate);
+    return () => { if (animRef.current !== null) cancelAnimationFrame(animRef.current); };
   }, []);
 
   // Follow selected aircraft
