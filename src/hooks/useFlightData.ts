@@ -257,9 +257,31 @@ const TYPE_WIKI: Record<string, string> = {
   G550: 'Gulfstream_V', G650: 'Gulfstream_G650',
 };
 
-async function fetchWikiPhoto(typeCode: string): Promise<JetPhoto | null> {
-  const article = TYPE_WIKI[typeCode.toUpperCase()];
-  if (!article) return null;
+// When a civilian ICAO type code belongs to a military variant, use this instead
+const MILITARY_TYPE_WIKI: Record<string, string> = {
+  B762: 'Boeing_KC-46_Pegasus',         // KC-46A Pegasus tanker
+  B763: 'Boeing_VC-25',                  // C-32A / VC-25A
+  B752: 'Boeing_C-32',                   // C-32A VIP transport
+  B744: 'Boeing_E-4',                    // E-4B Nightwatch
+  B772: 'Boeing_E-767',                  // E-767 AWACS variant
+  DC87: 'Boeing_C-17_Globemaster_III',   // sometimes listed as DC-8 derivative
+  L100: 'Lockheed_C-130_Hercules',       // civilian C-130 designation
+  C130: 'Lockheed_C-130_Hercules',
+  C17: 'Boeing_C-17_Globemaster_III',
+};
+
+// Guaranteed category-level fallback — ensures every airborne aircraft gets a photo
+const CATEGORY_FALLBACK_WIKI: Record<string, string> = {
+  commercial: 'Airbus_A320_family',
+  cargo:      'Boeing_747-8',
+  military:   'Lockheed_C-130_Hercules',
+  private:    'Cessna_172',
+  helicopter: 'Bell_206',
+  glider:     'Glider_aircraft',
+  drone:      'General_Atomics_MQ-9_Reaper',
+};
+
+async function fetchWikiArticle(article: string): Promise<JetPhoto | null> {
   try {
     const res = await axios.get<{ thumbnail?: { source: string }; title: string }>(
       `https://en.wikipedia.org/api/rest_v1/page/summary/${encodeURIComponent(article)}`,
@@ -271,6 +293,11 @@ async function fetchWikiPhoto(typeCode: string): Promise<JetPhoto | null> {
   } catch {
     return null;
   }
+}
+
+async function fetchWikiPhoto(typeCode: string): Promise<JetPhoto | null> {
+  const article = TYPE_WIKI[typeCode.toUpperCase()];
+  return article ? fetchWikiArticle(article) : null;
 }
 
 // ─── Planespotters.net — CORS-enabled, returns info + photos in one call ───
@@ -328,7 +355,8 @@ export async function fetchAircraftInfo(icao24: string): Promise<AircraftInfo | 
   }
 }
 
-export async function fetchJetPhoto(icao24: string, typeCode?: string): Promise<JetPhoto | null> {
+export async function fetchJetPhoto(icao24: string, typeCode?: string, category?: string): Promise<JetPhoto | null> {
+  // 1. Planespotters — real registration photo (best match)
   try {
     const res = await axios.get<PlanespottersResponse>(
       `https://api.planespotters.net/pub/aircraft/${icao24}`,
@@ -339,9 +367,30 @@ export async function fetchJetPhoto(icao24: string, typeCode?: string): Promise<
       const imageUrl = photo.large?.src ?? photo.medium?.src ?? photo.thumbnail?.src ?? '';
       if (imageUrl) return { imageUrl, photographer: photo.photographer ?? 'Unknown' };
     }
-  } catch {
-    // fall through to Wikipedia fallback
+  } catch { /* fall through */ }
+
+  const tc = typeCode?.toUpperCase();
+
+  // 2. Military override — civilian type codes used by military variants
+  if (category === 'military' && tc) {
+    const photo = await fetchWikiArticle(MILITARY_TYPE_WIKI[tc] ?? '').catch(() => null);
+    if (photo) return photo;
   }
-  if (typeCode) return fetchWikiPhoto(typeCode);
+
+  // 3. Type-code specific Wikipedia article
+  if (tc) {
+    const photo = await fetchWikiPhoto(tc);
+    if (photo) return photo;
+  }
+
+  // 4. Category-level fallback — guarantees a photo for every airborne aircraft
+  if (category && category !== 'ground') {
+    const article = CATEGORY_FALLBACK_WIKI[category];
+    if (article) {
+      const photo = await fetchWikiArticle(article);
+      if (photo) return photo;
+    }
+  }
+
   return null;
 }

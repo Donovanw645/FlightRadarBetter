@@ -36,10 +36,12 @@ export default function AircraftSidebar() {
     setLoadingPhoto(true);
     setPhotoError(false);
 
+    const acCat = getAircraftCategory(ac);
+
     // Both info and photo come from planespotters.net — fire in parallel
     Promise.all([
       fetchAircraftInfo(ac.icao24),
-      fetchJetPhoto(ac.icao24, ac.typeCode),
+      fetchJetPhoto(ac.icao24, ac.typeCode, acCat),
     ]).then(([info, photo]) => {
       setAircraftInfo(info);
       setJetPhoto(photo);
@@ -119,8 +121,11 @@ function SidebarContent({
               </span>
             )}
           </div>
+          {aircraftInfo?.model && (
+            <p className="text-sm text-gray-200 mt-0.5 leading-tight">{aircraftInfo.model}</p>
+          )}
           {aircraftInfo?.registration && (
-            <p className="text-xs text-gray-400 mt-0.5 font-mono">{aircraftInfo.registration}</p>
+            <p className="text-xs text-gray-500 mt-0.5 font-mono">{aircraftInfo.registration}</p>
           )}
         </div>
         <div className="flex items-center gap-1.5 shrink-0">
