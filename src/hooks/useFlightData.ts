@@ -4,8 +4,10 @@ import { useFlightStore } from '../store/useFlightStore';
 import type { Aircraft } from '../types';
 import { haversineDistance } from '../utils/aircraftUtils';
 
-// adsb.fi public API — free, no auth required, CORS-enabled
-const ADSB_FI_URL = 'https://api.adsb.fi/v1/flights';
+// adsb.fi open data — free, no auth, CORS-enabled, geographic endpoint
+// Docs: https://github.com/adsbfi/opendata
+const ADSB_FI_BASE = 'https://opendata.adsb.fi/api';
+const RADIUS_NM = 250; // max allowed by adsb.fi
 const REFRESH_INTERVAL = 15000;
 
 interface AdsbFiAircraft {
@@ -19,7 +21,7 @@ interface AdsbFiAircraft {
   track?: number;
   baro_rate?: number;         // feet/minute
   squawk?: string;
-  category?: string;          // e.g. "A3", "B6"
+  category?: string;          // "A3", "B6", etc.
   on_ground?: boolean;
 }
 
@@ -39,10 +41,9 @@ function mapCategory(cat?: string): number {
 }
 
 function parseAdsbFiData(data: AdsbFiResponse): Aircraft[] {
-  return (data.ac ?? []).map((ac) => {
+  return (data?.ac ?? []).map((ac) => {
     const onGround = ac.alt_baro === 'ground' || ac.on_ground === true;
     const altBaroFt = typeof ac.alt_baro === 'number' ? ac.alt_baro : null;
-
     return {
       icao24: ac.hex.toLowerCase(),
       callsign: ac.flight?.trim() || null,
@@ -51,13 +52,13 @@ function parseAdsbFiData(data: AdsbFiResponse): Aircraft[] {
       last_contact: Math.floor(Date.now() / 1000),
       longitude: ac.lon ?? null,
       latitude: ac.lat ?? null,
-      // adsb.fi reports feet; our utils expect meters
+      // adsb.fi uses feet; our utils expect metres
       baro_altitude: altBaroFt !== null ? altBaroFt / 3.28084 : null,
       on_ground: onGround,
-      // adsb.fi reports knots; our utils expect m/s
+      // adsb.fi uses knots; our utils expect m/s
       velocity: ac.gs !== undefined ? ac.gs / 1.94384 : null,
       true_track: ac.track ?? null,
-      // adsb.fi reports ft/min; our utils expect m/s
+      // adsb.fi uses ft/min; our utils expect m/s
       vertical_rate: ac.baro_rate !== undefined ? ac.baro_rate / 196.85 : null,
       sensors: null,
       geo_altitude: ac.alt_geom !== undefined ? ac.alt_geom / 3.28084 : null,
@@ -75,6 +76,7 @@ export function useFlightData() {
     setIsLoading,
     setLastUpdate,
     setFetchError,
+    mapCenter,
     spottingAlerts,
     addTriggeredAlert,
     userLocation,
@@ -87,7 +89,9 @@ export function useFlightData() {
     if (!isMountedRef.current) return;
     try {
       setIsLoading(true);
-      const res = await axios.get<AdsbFiResponse>(ADSB_FI_URL, { timeout: 15000 });
+      const [lat, lon] = mapCenter;
+      const url = `${ADSB_FI_BASE}/v3/lat/${lat.toFixed(2)}/lon/${lon.toFixed(2)}/dist/${RADIUS_NM}`;
+      const res = await axios.get<AdsbFiResponse>(url, { timeout: 15000 });
       if (!isMountedRef.current) return;
 
       const aircraft = parseAdsbFiData(res.data);
@@ -113,7 +117,8 @@ export function useFlightData() {
           }
         }
       }
-    } catch {
+    } catch (err) {
+      console.error('[PlaneTracker] fetch error:', err);
       if (isMountedRef.current) {
         setFetchError('Unable to load flight data — retrying shortly');
       }
@@ -130,7 +135,7 @@ export function useFlightData() {
       isMountedRef.current = false;
       if (intervalRef.current) clearInterval(intervalRef.current);
     };
-  }, [spottingAlerts, userLocation]);
+  }, [mapCenter, spottingAlerts, userLocation]);
 }
 
 export async function fetchAircraftInfo(icao24: string) {

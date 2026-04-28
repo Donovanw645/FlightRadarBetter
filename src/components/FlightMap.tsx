@@ -47,6 +47,7 @@ export default function FlightMap() {
   const markersRef = useRef<Map<string, L.Marker>>(new Map());
   const spottingCirclesRef = useRef<L.Circle[]>([]);
   const containerRef = useRef<HTMLDivElement>(null);
+  const movDebounceRef = useRef<ReturnType<typeof setTimeout> | null>(null);
 
   const {
     aircraft,
@@ -57,19 +58,28 @@ export default function FlightMap() {
     spottingAlerts,
     followAircraft,
     setUserLocation,
+    setMapCenter,
   } = useFlightStore();
 
   // Init map
   useEffect(() => {
     if (!containerRef.current || mapRef.current) return;
     const map = L.map(containerRef.current, {
-      center: [40, -30],
-      zoom: 4,
+      center: [48, 11],
+      zoom: 5,
       zoomControl: false,
       attributionControl: true,
     });
     L.control.zoom({ position: 'bottomright' }).addTo(map);
     mapRef.current = map;
+
+    map.on('moveend', () => {
+      if (movDebounceRef.current) clearTimeout(movDebounceRef.current);
+      movDebounceRef.current = setTimeout(() => {
+        const c = map.getCenter();
+        setMapCenter([c.lat, c.lng]);
+      }, 800);
+    });
 
     const tile = TILE_LAYERS[mapStyle];
     tileRef.current = L.tileLayer(tile.url, { attribution: tile.attribution, maxZoom: 19 }).addTo(map);

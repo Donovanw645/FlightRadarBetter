@@ -11,6 +11,7 @@ interface FlightStore {
   spottingAlerts: SpottingAlert[];
   triggeredAlerts: SpottingAlert[];
   userLocation: [number, number] | null;
+  mapCenter: [number, number];
   isLoading: boolean;
   lastUpdate: Date | null;
   fetchError: string | null;
@@ -29,6 +30,7 @@ interface FlightStore {
   addTriggeredAlert: (alert: SpottingAlert) => void;
   dismissTriggeredAlert: (id: string) => void;
   setUserLocation: (loc: [number, number] | null) => void;
+  setMapCenter: (center: [number, number]) => void;
   setIsLoading: (loading: boolean) => void;
   setLastUpdate: (date: Date) => void;
   setFetchError: (error: string | null) => void;
@@ -56,6 +58,7 @@ export const useFlightStore = create<FlightStore>((set) => ({
   spottingAlerts: [],
   triggeredAlerts: [],
   userLocation: null,
+  mapCenter: [48, 11], // Default: central Europe (busy airspace)
   isLoading: false,
   lastUpdate: null,
   fetchError: null,
@@ -83,6 +86,7 @@ export const useFlightStore = create<FlightStore>((set) => ({
   dismissTriggeredAlert: (id) =>
     set((state) => ({ triggeredAlerts: state.triggeredAlerts.filter((a) => a.id !== id) })),
   setUserLocation: (userLocation) => set({ userLocation }),
+  setMapCenter: (mapCenter) => set({ mapCenter }),
   setIsLoading: (isLoading) => set({ isLoading }),
   setLastUpdate: (lastUpdate) => set({ lastUpdate }),
   setFetchError: (fetchError) => set({ fetchError }),
