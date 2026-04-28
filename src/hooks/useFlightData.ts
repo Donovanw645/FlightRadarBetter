@@ -216,22 +216,45 @@ const TYPE_WIKI: Record<string, string> = {
   C172: 'Cessna_172', C182: 'Cessna_182', C208: 'Cessna_208_Caravan',
   BE20: 'Beechcraft_Super_King_Air', BE35: 'Beechcraft_Bonanza',
   PA28: 'Piper_Cherokee', PC12: 'Pilatus_PC-12',
-  // Military
+  // Military fixed-wing
   C130: 'Lockheed_C-130_Hercules', C17: 'Boeing_C-17_Globemaster_III',
   KC135: 'Boeing_KC-135_Stratotanker', KC10: 'McDonnell_Douglas_KC-10_Extender',
+  KC46: 'Boeing_KC-46_Pegasus',
   F16: 'General_Dynamics_F-16_Fighting_Falcon', F15: 'McDonnell_Douglas_F-15_Eagle',
   F18: 'McDonnell_Douglas_F/A-18_Hornet', F35: 'Lockheed_Martin_F-35_Lightning_II',
   F22: 'Lockheed_Martin_F-22_Raptor', B52: 'Boeing_B-52_Stratofortress',
   B2: 'Northrop_Grumman_B-2_Spirit', U2: 'Lockheed_U-2',
   A10: 'Fairchild_Republic_A-10_Thunderbolt_II', V22: 'Bell_Boeing_V-22_Osprey',
-  // Helicopters
-  EC35: 'Eurocopter_EC135', EC45: 'Airbus_H145', B06: 'Bell_206',
-  R44: 'Robinson_R44', S76: 'Sikorsky_S-76', AS32: 'Aerospatiale_AS332_Super_Puma',
+  E3: 'Boeing_E-3_Sentry', E8: 'Northrop_Grumman_E-8_Joint_STARS',
+  P3: 'Lockheed_P-3_Orion', P8: 'Boeing_P-8_Poseidon',
+  C5M: 'Lockheed_C-5_Galaxy', C141: 'Lockheed_C-141_Starlifter',
+  // Helicopters — civil
+  EC35: 'Airbus_H135', EC45: 'Airbus_H145', EC30: 'Eurocopter_EC130',
+  EC20: 'Eurocopter_EC120_Colibri', EC55: 'Airbus_H155',
+  H135: 'Airbus_H135', H145: 'Airbus_H145', H160: 'Airbus_H160',
+  AS32: 'Aerospatiale_AS332_Super_Puma', AS35: 'Eurocopter_AS350', AS65: 'Eurocopter_AS365_Dauphin',
+  AW13: 'Leonardo_AW139', AW16: 'Leonardo_AW169', AW10: 'Leonardo_AW101',
+  B06: 'Bell_206', B47: 'Bell_47', B212: 'Bell_212', B412: 'Bell_412',
+  B429: 'Bell_429', B505: 'Bell_505', B525: 'Bell_525',
+  R22: 'Robinson_R22', R44: 'Robinson_R44', R66: 'Robinson_R66',
+  S61: 'Sikorsky_S-61', S76: 'Sikorsky_S-76', S92: 'Sikorsky_S-92',
+  MD52: 'MD_Helicopters_MD_500', MD60: 'MD_Helicopters_MD_600',
+  MI8: 'Mil_Mi-8', MI17: 'Mil_Mi-17', MI26: 'Mil_Mi-26',
+  // Helicopters — military
+  UH60: 'Sikorsky_UH-60_Black_Hawk', HH60: 'Sikorsky_UH-60_Black_Hawk',
+  SH60: 'Sikorsky_UH-60_Black_Hawk', MH60: 'Sikorsky_UH-60_Black_Hawk',
+  CH47: 'Boeing_CH-47_Chinook', MH47: 'Boeing_CH-47_Chinook',
+  AH64: 'Boeing_AH-64_Apache', AH1: 'Bell_AH-1_SuperCobra',
+  OH58: 'Bell_OH-58_Kiowa', UH1: 'Bell_UH-1_Iroquois',
+  CH53: 'Sikorsky_CH-53_Sea_Stallion', MH53: 'Sikorsky_CH-53_Sea_Stallion',
   // Business jets
   GL5T: 'Bombardier_Global_5000', GLEX: 'Bombardier_Global_Express',
-  F900: 'Dassault_Falcon_900', F2TH: 'Dassault_Falcon_2000',
-  C56X: 'Cessna_Citation_X', C680: 'Cessna_Citation_Sovereign',
-  LJ45: 'Learjet_45', LJ60: 'Learjet_60',
+  GL7T: 'Bombardier_Global_7500',
+  F900: 'Dassault_Falcon_900', F2TH: 'Dassault_Falcon_2000', F7X: 'Dassault_Falcon_7X',
+  C56X: 'Cessna_Citation_X', C680: 'Cessna_Citation_Sovereign', C750: 'Cessna_Citation_X',
+  LJ45: 'Learjet_45', LJ60: 'Learjet_60', LJ75: 'Learjet_75',
+  GALX: 'Israel_Aerospace_Industries_Galaxy', G280: 'Gulfstream_G280',
+  G550: 'Gulfstream_V', G650: 'Gulfstream_G650',
 };
 
 async function fetchWikiPhoto(typeCode: string): Promise<JetPhoto | null> {
