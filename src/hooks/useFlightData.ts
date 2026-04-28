@@ -4,11 +4,8 @@ import { useFlightStore } from '../store/useFlightStore';
 import type { Aircraft } from '../types';
 import { haversineDistance } from '../utils/aircraftUtils';
 
-// adsb.fi open data routed through a CORS proxy (adsb.fi blocks direct browser requests)
-// Docs: https://github.com/adsbfi/opendata
 const ADSB_FI_BASE = 'https://opendata.adsb.fi/api';
-const CORS_PROXY = 'https://corsproxy.io/?';
-const RADIUS_NM = 250; // max allowed by adsb.fi
+const RADIUS_NM = 250;
 const REFRESH_INTERVAL = 15000;
 
 interface AdsbFiAircraft {
@@ -16,13 +13,13 @@ interface AdsbFiAircraft {
   flight?: string;
   lat?: number;
   lon?: number;
-  alt_baro?: number | string; // feet, or the string "ground"
-  alt_geom?: number;          // feet
-  gs?: number;                // knots
+  alt_baro?: number | string;
+  alt_geom?: number;
+  gs?: number;
   track?: number;
-  baro_rate?: number;         // feet/minute
+  baro_rate?: number;
   squawk?: string;
-  category?: string;          // "A3", "B6", etc.
+  category?: string;
   on_ground?: boolean;
 }
 
@@ -32,11 +29,16 @@ interface AdsbFiResponse {
   total: number;
 }
 
+// Normalise Leaflet longitude (can exceed ±180 when scrolling past dateline)
+function normaliseLon(lon: number): number {
+  return ((((lon + 180) % 360) + 360) % 360) - 180;
+}
+
 function mapCategory(cat?: string): number {
   if (!cat || cat.length < 2) return 0;
-  if (cat === 'A7') return 7;   // Rotorcraft → helicopter
-  if (cat === 'B6') return 14;  // UAV
-  if (cat === 'B1') return 9;   // Glider
+  if (cat === 'A7') return 7;
+  if (cat === 'B6') return 14;
+  if (cat === 'B1') return 9;
   if (cat[0] === 'A') return parseInt(cat[1]) || 0;
   return 0;
 }
@@ -53,13 +55,10 @@ function parseAdsbFiData(data: AdsbFiResponse): Aircraft[] {
       last_contact: Math.floor(Date.now() / 1000),
       longitude: ac.lon ?? null,
       latitude: ac.lat ?? null,
-      // adsb.fi uses feet; our utils expect metres
       baro_altitude: altBaroFt !== null ? altBaroFt / 3.28084 : null,
       on_ground: onGround,
-      // adsb.fi uses knots; our utils expect m/s
       velocity: ac.gs !== undefined ? ac.gs / 1.94384 : null,
       true_track: ac.track ?? null,
-      // adsb.fi uses ft/min; our utils expect m/s
       vertical_rate: ac.baro_rate !== undefined ? ac.baro_rate / 196.85 : null,
       sensors: null,
       geo_altitude: ac.alt_geom !== undefined ? ac.alt_geom / 3.28084 : null,
@@ -69,6 +68,33 @@ function parseAdsbFiData(data: AdsbFiResponse): Aircraft[] {
       category: mapCategory(ac.category),
     };
   });
+}
+
+async function fetchAdsbFi(lat: number, lon: number): Promise<AdsbFiResponse> {
+  const target = `${ADSB_FI_BASE}/v3/lat/${lat.toFixed(2)}/lon/${lon.toFixed(2)}/dist/${RADIUS_NM}`;
+
+  // corsproxy.io: append raw URL (NOT encoded) after the ?
+  try {
+    const res = await axios.get<AdsbFiResponse>(
+      `https://corsproxy.io/?${target}`,
+      { timeout: 14000 }
+    );
+    return res.data;
+  } catch (e1) {
+    console.warn('[PlaneTracker] corsproxy.io failed, trying allorigins:', e1);
+  }
+
+  // allorigins /get: wraps response in { contents: string }
+  try {
+    const res = await axios.get<{ contents: string }>(
+      `https://api.allorigins.win/get?url=${encodeURIComponent(target)}`,
+      { timeout: 18000 }
+    );
+    return JSON.parse(res.data.contents) as AdsbFiResponse;
+  } catch (e2) {
+    console.error('[PlaneTracker] both proxies failed:', e2);
+    throw e2;
+  }
 }
 
 export function useFlightData() {
@@ -83,30 +109,23 @@ export function useFlightData() {
     userLocation,
   } = useFlightStore();
 
-  const intervalRef = useRef<ReturnType<typeof setInterval> | null>(null);
+  // Ref so fetchFlights always uses the latest center without restarting the interval
+  const mapCenterRef = useRef<[number, number]>(mapCenter);
+  mapCenterRef.current = mapCenter;
+
   const isMountedRef = useRef(true);
+  const intervalRef = useRef<ReturnType<typeof setInterval> | null>(null);
+  const panDebounceRef = useRef<ReturnType<typeof setTimeout> | null>(null);
 
   const fetchFlights = async () => {
     if (!isMountedRef.current) return;
     try {
       setIsLoading(true);
-      const [lat, lon] = mapCenter;
-      const targetUrl = `${ADSB_FI_BASE}/v3/lat/${lat.toFixed(2)}/lon/${lon.toFixed(2)}/dist/${RADIUS_NM}`;
+      const [rawLat, rawLon] = mapCenterRef.current;
+      const lat = Math.max(-85, Math.min(85, rawLat));
+      const lon = normaliseLon(rawLon);
 
-      // adsb.fi has no CORS headers, route through proxy
-      let data: AdsbFiResponse;
-      try {
-        const res = await axios.get(`${CORS_PROXY}${encodeURIComponent(targetUrl)}`, { timeout: 15000 });
-        data = (typeof res.data === 'string' ? JSON.parse(res.data) : res.data) as AdsbFiResponse;
-      } catch {
-        // Fallback: allorigins.win proxy
-        const res = await axios.get(
-          `https://api.allorigins.win/raw?url=${encodeURIComponent(targetUrl)}`,
-          { timeout: 20000 }
-        );
-        data = (typeof res.data === 'string' ? JSON.parse(res.data) : res.data) as AdsbFiResponse;
-      }
-
+      const data = await fetchAdsbFi(lat, lon);
       if (!isMountedRef.current) return;
 
       const aircraft = parseAdsbFiData(data);
@@ -132,16 +151,14 @@ export function useFlightData() {
           }
         }
       }
-    } catch (err) {
-      console.error('[PlaneTracker] fetch error:', err);
-      if (isMountedRef.current) {
-        setFetchError('Unable to load flight data — retrying shortly');
-      }
+    } catch {
+      if (isMountedRef.current) setFetchError('Unable to load flight data — retrying shortly');
     } finally {
       if (isMountedRef.current) setIsLoading(false);
     }
   };
 
+  // Main interval — only restarts when alerts/location change, NOT on every pan
   useEffect(() => {
     isMountedRef.current = true;
     fetchFlights();
@@ -150,7 +167,18 @@ export function useFlightData() {
       isMountedRef.current = false;
       if (intervalRef.current) clearInterval(intervalRef.current);
     };
-  }, [mapCenter, spottingAlerts, userLocation]);
+  }, [spottingAlerts, userLocation]);
+
+  // On map pan: trigger one fresh fetch after a short settle delay
+  useEffect(() => {
+    if (panDebounceRef.current) clearTimeout(panDebounceRef.current);
+    panDebounceRef.current = setTimeout(() => {
+      if (isMountedRef.current) fetchFlights();
+    }, 600);
+    return () => {
+      if (panDebounceRef.current) clearTimeout(panDebounceRef.current);
+    };
+  }, [mapCenter]);
 }
 
 export async function fetchAircraftInfo(icao24: string) {
