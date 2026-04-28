@@ -4,32 +4,69 @@ import { useFlightStore } from '../store/useFlightStore';
 import type { Aircraft } from '../types';
 import { haversineDistance } from '../utils/aircraftUtils';
 
-const OPENSKY_URL = 'https://opensky-network.org/api/states/all';
-const PROXY_URL = `https://api.allorigins.win/get?url=${encodeURIComponent(OPENSKY_URL)}`;
+// adsb.fi public API — free, no auth required, CORS-enabled
+const ADSB_FI_URL = 'https://api.adsb.fi/v1/flights';
 const REFRESH_INTERVAL = 15000;
 
-function parseOpenSkyData(data: { states: unknown[][] | null }): Aircraft[] {
-  const states: unknown[][] = data?.states ?? [];
-  return states.map((s) => ({
-    icao24: s[0] as string,
-    callsign: (s[1] as string)?.trim() || null,
-    origin_country: s[2] as string,
-    time_position: s[3] as number | null,
-    last_contact: s[4] as number,
-    longitude: s[5] as number | null,
-    latitude: s[6] as number | null,
-    baro_altitude: s[7] as number | null,
-    on_ground: s[8] as boolean,
-    velocity: s[9] as number | null,
-    true_track: s[10] as number | null,
-    vertical_rate: s[11] as number | null,
-    sensors: s[12] as number[] | null,
-    geo_altitude: s[13] as number | null,
-    squawk: s[14] as string | null,
-    spi: s[15] as boolean,
-    position_source: s[16] as number,
-    category: (s[17] as number) ?? 0,
-  }));
+interface AdsbFiAircraft {
+  hex: string;
+  flight?: string;
+  lat?: number;
+  lon?: number;
+  alt_baro?: number | string; // feet, or the string "ground"
+  alt_geom?: number;          // feet
+  gs?: number;                // knots
+  track?: number;
+  baro_rate?: number;         // feet/minute
+  squawk?: string;
+  category?: string;          // e.g. "A3", "B6"
+  on_ground?: boolean;
+}
+
+interface AdsbFiResponse {
+  ac: AdsbFiAircraft[];
+  now: number;
+  total: number;
+}
+
+function mapCategory(cat?: string): number {
+  if (!cat || cat.length < 2) return 0;
+  if (cat === 'A7') return 7;   // Rotorcraft → helicopter
+  if (cat === 'B6') return 14;  // UAV
+  if (cat === 'B1') return 9;   // Glider
+  if (cat[0] === 'A') return parseInt(cat[1]) || 0;
+  return 0;
+}
+
+function parseAdsbFiData(data: AdsbFiResponse): Aircraft[] {
+  return (data.ac ?? []).map((ac) => {
+    const onGround = ac.alt_baro === 'ground' || ac.on_ground === true;
+    const altBaroFt = typeof ac.alt_baro === 'number' ? ac.alt_baro : null;
+
+    return {
+      icao24: ac.hex.toLowerCase(),
+      callsign: ac.flight?.trim() || null,
+      origin_country: '',
+      time_position: null,
+      last_contact: Math.floor(Date.now() / 1000),
+      longitude: ac.lon ?? null,
+      latitude: ac.lat ?? null,
+      // adsb.fi reports feet; our utils expect meters
+      baro_altitude: altBaroFt !== null ? altBaroFt / 3.28084 : null,
+      on_ground: onGround,
+      // adsb.fi reports knots; our utils expect m/s
+      velocity: ac.gs !== undefined ? ac.gs / 1.94384 : null,
+      true_track: ac.track ?? null,
+      // adsb.fi reports ft/min; our utils expect m/s
+      vertical_rate: ac.baro_rate !== undefined ? ac.baro_rate / 196.85 : null,
+      sensors: null,
+      geo_altitude: ac.alt_geom !== undefined ? ac.alt_geom / 3.28084 : null,
+      squawk: ac.squawk ?? null,
+      spi: false,
+      position_source: 0,
+      category: mapCategory(ac.category),
+    };
+  });
 }
 
 export function useFlightData() {
@@ -50,21 +87,10 @@ export function useFlightData() {
     if (!isMountedRef.current) return;
     try {
       setIsLoading(true);
-
-      let data: { states: unknown[][] | null };
-
-      try {
-        const res = await axios.get<{ states: unknown[][] | null }>(OPENSKY_URL, { timeout: 12000 });
-        data = res.data;
-      } catch {
-        // Direct fetch failed (CORS or network); try via proxy
-        const proxyRes = await axios.get<{ contents: string }>(PROXY_URL, { timeout: 15000 });
-        data = JSON.parse(proxyRes.data.contents) as { states: unknown[][] | null };
-      }
-
+      const res = await axios.get<AdsbFiResponse>(ADSB_FI_URL, { timeout: 15000 });
       if (!isMountedRef.current) return;
 
-      const aircraft = parseOpenSkyData(data);
+      const aircraft = parseAdsbFiData(res.data);
       setAircraft(aircraft);
       setLastUpdate(new Date());
       setFetchError(null);
